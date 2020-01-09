@@ -1,0 +1,36 @@
+---
+title: "Estimation of Fatal Crashes"
+author: "Lucas Anderton, Hannah Brown, Lucas Gorak, Edward Mikkelson"
+date: "1/8/2020"
+output: 
+  beamer_presentation: 
+    theme: "metropolis"
+    colortheme: "seahorse"
+urlcolor: "blue"
+---
+
+## Question
+Estimation of fatalities from historically documented characteristics of driving patterns?
+The literature says...
+This is why it's important... 
+
+## Data Collection Procedure
+-Open Data DC: Crash data and Details data
+-Merge?
+
+## Interesting Features and Data Processing 
+- Crashes has 223990 observations and 60 columns 
+- Details has 443867 observations and 15 variables
+- Ages beginning at -7990 and ranged up to 237
+- License plate `None` produced a high number of crashes in the data set
+- The full dataset reaches back until 1975
+
+## Methods
+-recode major and minor injuries
+-recode person to numerical
+-recode ticketissued to numerical
+-recode speeding to numerical
+
+## Analysis
+
+## Future Implications
