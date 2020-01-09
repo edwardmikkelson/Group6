@@ -1,22 +1,28 @@
 library(tidyverse)
-library(here)
-library(gss)
-library(Sleuth3)
+library(lubridate)
+# library(here)
+# library(gss)
+# library(Sleuth3)
 
-crashes <- read_csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
-head(crashes)
+#crashes <- read_csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
+#head(crashes)
 
-ggplot(filter(crashes, AGE > 16 & AGE < 100 & FATAL == "Y")) +
-  geom_bar(aes(AGE, fill=LICENSEPLATESTATE))
+#ggplot(filter(crashes, AGE > 16 & AGE < 100 & FATAL == "Y")) +
+  #geom_bar(aes(AGE, fill=LICENSEPLATESTATE))
 
-ggplot(ex1222) +
-  geom_point(aes(x))
+#ggplot(ex1222) +
+  #geom_point(aes(x))
 
 threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
 head(threeoneone)
 
 trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
 head(trafficrequests)
+
+trafficrequests %>% 
+  mutate(WARD = replace(x= WARD, 7, "Ward 7"))
+
+View(trafficrequests)
 
 crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
 na.omit(crashes)
