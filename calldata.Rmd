@@ -1,0 +1,105 @@
+---
+title: "calldata"
+author: "Hannah Brown"
+date: "1/9/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+
+```{r}
+threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+head(threeoneone)
+
+trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
+head(trafficrequests)
+
+trafficrequests %>% 
+  mutate(WARD = replace(x= WARD, 7, "Ward 7"))
+
+view(trafficrequests)
+```
+
+```{r}
+crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+
+crashes$WARD[crashes$WARD == "Null"] <- NA
+
+summary(is.na(crashes))
+#crashes2 <- na.omit(crashes)
+
+# throw out columns
+crashes$LOCATIONERROR <- crashes$LASTUPDATEDATE <- crashes$MPDLATITUDE <- crashes$MPDLONGITUDE <- crashes$MPDGEOX <- crashes$MPDGEOY <- crashes$STREETSEGID <- crashes$ROADWAYSEGID <- crashes$MAR_ADDRESS <- crashes$TODATE <- crashes$FATALPASSENGER <- crashes$MAJORINJURIESPASSENGER <- crashes$UNKNOWNINJURIESPASSENGER <- NULL
+
+View(crashes)
+nrow(crashes)
+```
+
+```{r}
+#doing amelia for passenger data
+library(Amelia)
+am_output <- amelia(crashes, noms = c("FATALPASSENGER"), ords = c("MAJORINJURIESPASSENGER", "MINORINJURIESPASSENGER", "UNKNOWNINJURIESPASSENGER"))
+
+#Amelia Error Code:  38  The following variable(s) are characters: CCN, ROUTEID, ADDRESS, WARD, EVENTID, NEARESTINTROUTEID, NEARESTINTSTREETNAME, INTAPPROACHDIRECTION, BLOCKKEY, SUBBLOCKKEYYou may have wanted to set this as a ID variable to remove it from the imputation model or as an ordinal or nominal variable to be imputed.  Please set it as either and try again. 
+```
+
+```{r}
+Crashes2012 <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
+```
+
+```{r}
+#recoding variables to standardize responses
+Crashes2012 %>% 
+  mutate(`WARD` = recode(WARD, "1" = "WARD 1", 
+                         "2" = "WARD 2", 
+                         "3" = "WARD 3",
+                         "4" = "WARD 4",
+                         "5" = "WARD 5",
+                         "6" = "WARD 6",
+                         "7" = "WARD 7")) ->
+  Crashes2012
+head(Crashes2012$WARD)
+```
+
+```{r}
+#omitting all na values - did not work
+#crashes2012 %>% 
+ # na.omit(crashes2012$WARD) ->
+ # crashes2012
+```
+
+```{r}
+#library(naniar)
+#Crashes2012 %>% 
+  #replace_with_na(replace = WARD(x = NULL)) ->
+  #nona_crashes
+```
+
+```{r}
+#removing all null values
+#no_null <- names(crashes2012) %in% c("Null")
+#crashes2012 <- crashes2012[!no_null]
+```
+
+
+```{r}
+ggplot() +
+  geom_point(data = trafficrequests, aes(x = ADDDATE), stat = "bin") +
+  geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
+  geom_point(data = Crashes2012, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(Crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
+  facet_wrap(~ WARD, nrow=3)
+```
+
+```{r}
+ggplot() +
+  geom_point(data = Crashes2012, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(Crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
+  facet_wrap(~ WARD, nrow=3)
+```
+

@@ -10,6 +10,8 @@ urlcolor: "blue"
 ---
 
 ## Question
+For every additional 311 request in a particular, what is the effect on frequency of crashes?
+How does the average latency between requested date and due date differ between wards?
 Estimation of fatalities from historically documented characteristics of driving patterns?
 The literature says...
 This is why it's important... 
