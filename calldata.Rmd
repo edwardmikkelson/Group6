@@ -52,16 +52,18 @@ am_output <- amelia(crashes, noms = c("FATALPASSENGER"), ords = c("MAJORINJURIES
 Crashes2012 <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
 ```
 
-```{r}
-#recoding variables to standardize responses
+turns out, we actually only needed to do this to the 311 requests. I didn't realize crashes was the data higher on the Y. So disregard the following chunk: 
+```
+
 Crashes2012 %>% 
-  mutate(`WARD` = recode(WARD, "1" = "WARD 1", 
-                         "2" = "WARD 2", 
-                         "3" = "WARD 3",
-                         "4" = "WARD 4",
-                         "5" = "WARD 5",
-                         "6" = "WARD 6",
-                         "7" = "WARD 7")) ->
+  mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
+                         "2" = "Ward 2",
+                         "3" = "Ward 3",
+                         "4" = "Ward 4",
+                         "5" = "Ward 5",
+                         "6" = "Ward 6",
+                         "7" = "Ward 7",
+                         "8" = "Ward 8")) ->
   Crashes2012
 head(Crashes2012$WARD)
 ```
@@ -86,8 +88,38 @@ head(Crashes2012$WARD)
 #crashes2012 <- crashes2012[!no_null]
 ```
 
+```{r}
+
+requests_fixed_wards <- trafficrequests
+
+requests_fixed_wards %>% 
+  mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
+                         "2" = "Ward 2", 
+                         "3" = "Ward 3",
+                         "4" = "Ward 4",
+                         "5" = "Ward 5",
+                         "6" = "Ward 6",
+                         "7" = "Ward 7",
+                         "8" = "Ward 8")) ->
+  requests_fixed_wards
+head(requests_fixed_wards$WARD)
+
+na.omit(requests_fixed_wards)
+na.omit(Crashes2012) # how do we omit all NULL and NA values?
+```
 
 ```{r}
+ggplot() +
+  geom_point(data = requests_fixed_wards, aes(x = ADDDATE), stat = "bin") +
+  geom_smooth(requests_fixed_wards, mapping = aes(x = ADDDATE), stat = "bin") +
+  geom_point(data = Crashes2012, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(Crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
+  facet_wrap(~ WARD, nrow=3)
+```
+
+
+```{r}
+# this one uses 
 ggplot() +
   geom_point(data = trafficrequests, aes(x = ADDDATE), stat = "bin") +
   geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
@@ -102,4 +134,11 @@ ggplot() +
   geom_smooth(Crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
   facet_wrap(~ WARD, nrow=3)
 ```
+
+
+```{r time_elapsed}
+requests_fixed_wards %>%
+  mutate()
+```
+
 

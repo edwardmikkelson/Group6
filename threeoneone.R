@@ -19,13 +19,13 @@ head(threeoneone)
 trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
 head(trafficrequests)
 
-trafficrequests %>% 
-  mutate(WARD = replace(x= WARD, 7, "Ward 7"))
-
-View(trafficrequests)
 
 crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
 na.omit(crashes)
+na.omit(trafficrequests)
+
+crashes %>% 
+  mutate(WARD = replace(x= WARD, 7, "Ward 7"))
 #crashes$FROMDATE <- as.Date(crashes$FROMDATE,
 # format = "%y-%m/%d")
 
@@ -42,7 +42,7 @@ ggplot() +
   geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
   geom_point(data = crashes2012, aes(x = FROMDATE), stat = "bin") +
   geom_smooth(crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
-  facet_wrap(~ WARD, nrow=3)
+  facet_wrap(~ WARD, nrow = 3)
 
 #anaemia <- read.table("http://jeffgill.org/files/jeffgill/files/anaemia.dat_.txt", header=TRUE, row.names=1)
 #head(anaemia)

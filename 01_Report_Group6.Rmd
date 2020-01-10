@@ -1,0 +1,23 @@
+---
+title: "Final Report"
+subtitle: "Group 6"
+author: "Lucas Anderton, Hannah Brown, Lucas Gorak, Edward Mikkelson"
+date: "1/9/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1 Social Science Question
+
+# 2 Context of the Question
+
+# 3 Data Collection Procedure
+
+# 4 Notes About Data Wrangling
+
+# 5 Statistical Methods
+
+# 6 Results
