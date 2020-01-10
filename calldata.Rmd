@@ -13,21 +13,21 @@ library(ggplot2)
 
 
 ```{r}
+crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
 threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
 head(threeoneone)
 
+```
+
+```{r}
 trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
 head(trafficrequests)
 
 trafficrequests %>% 
   mutate(WARD = replace(x= WARD, 7, "Ward 7"))
-
-view(trafficrequests)
 ```
 
 ```{r}
-crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
-
 crashes$WARD[crashes$WARD == "Null"] <- NA
 
 summary(is.na(crashes))
@@ -49,13 +49,15 @@ am_output <- amelia(crashes, noms = c("FATALPASSENGER"), ords = c("MAJORINJURIES
 ```
 
 ```{r}
-Crashes2012 <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
+crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
+
+
 ```
 
 turns out, we actually only needed to do this to the 311 requests. I didn't realize crashes was the data higher on the Y. So disregard the following chunk: 
 
 ```{r}
-# Crashes2012 %>% 
+# crashes %>% 
 #   mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
 #                          "2" = "Ward 2",
 #                          "3" = "Ward 3",
@@ -64,28 +66,28 @@ turns out, we actually only needed to do this to the 311 requests. I didn't real
 #                          "6" = "Ward 6",
 #                          "7" = "Ward 7",
 #                          "8" = "Ward 8")) ->
-#   Crashes2012
-# head(Crashes2012$WARD)
+#   crashes
+# head(crashes$WARD)
 ```
 
 ```{r}
 #omitting all na values - did not work
-#crashes2012 %>% 
- # na.omit(crashes2012$WARD) ->
- # crashes2012
+#crashes %>% 
+ # na.omit(crashes$WARD) ->
+ # crashes
 ```
 
 ```{r}
 #library(naniar)
-#Crashes2012 %>% 
+#crashes %>% 
   #replace_with_na(replace = WARD(x = NULL)) ->
   #nona_crashes
 ```
 
 ```{r}
 #removing all null values
-#no_null <- names(crashes2012) %in% c("Null")
-#crashes2012 <- crashes2012[!no_null]
+#no_null <- names(crashes) %in% c("Null")
+#crashes <- crashes[!no_null]
 ```
 
 ```{r}
@@ -105,15 +107,21 @@ requests_fixed_wards %>%
 head(requests_fixed_wards$WARD)
 
 na.omit(requests_fixed_wards)
-na.omit(Crashes2012) # how do we omit all NULL and NA values?
+na.omit(crashes) # how do we omit all NULL and NA values?
+```
+
+```{r time_elapsed}
+requests_fixed_wards$time_elapsed <- as.Date(as.character(requests_fixed_wards$SERVICEDUEDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(requests_fixed_wards$RESOLUTIONDATE), format = "%Y-%m-%d")
+View(requests_fixed_wards)
 ```
 
 ```{r}
 ggplot() +
   geom_point(data = requests_fixed_wards, aes(x = ADDDATE), stat = "bin") +
   geom_smooth(requests_fixed_wards, mapping = aes(x = ADDDATE), stat = "bin") +
-  geom_point(data = Crashes2012, aes(x = FROMDATE), stat = "bin") +
-  geom_smooth(Crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
+  geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
   facet_wrap(~ WARD, nrow=3)
 ```
 
@@ -122,23 +130,19 @@ uses the old trafficrequest frame
 # ggplot() +
 #   geom_point(data = trafficrequests, aes(x = ADDDATE), stat = "bin") +
 #   geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
-#   geom_point(data = Crashes2012, aes(x = FROMDATE), stat = "bin") +
-#   geom_smooth(Crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
+#   geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+#   geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
 #   facet_wrap(~ WARD, nrow=3)
 ```
 
 ```{r}
 # ggplot() +
-#   geom_point(data = Crashes2012, aes(x = FROMDATE), stat = "bin") +
-#   geom_smooth(Crashes2012, mapping = aes(x = FROMDATE), stat = "bin") +
+#   geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+#   geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
 #   facet_wrap(~ WARD, nrow=3)
 ```
 
 
-```{r time_elapsed}
-requests_fixed_wards$time_elapsed <- as.Date(as.character(requests_fixed_wards$SERVICEDUEDATE), format= "%Y-%m-%d") -
-  as.Date(as.character(requests_fixed_wards$RESOLUTIONDATE), format = "%Y-%m-%d")
-View(requests_fixed_wards)
-```
+
 
 
