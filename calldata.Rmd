@@ -1,0 +1,172 @@
+---
+title: "calldata"
+author: "Hannah Brown"
+date: "1/9/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+
+```{r}
+crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+head(threeoneone)
+
+```
+
+```{r}
+trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
+head(trafficrequests)
+
+trafficrequests %>% 
+  mutate(WARD = replace(x= WARD, 7, "Ward 7"))
+```
+
+```{r}
+crashes$WARD[crashes$WARD == "Null"] <- NA
+
+summary(is.na(crashes))
+#crashes2 <- na.omit(crashes)
+
+# throw out columns
+crashes$LOCATIONERROR <- crashes$LASTUPDATEDATE <- crashes$MPDLATITUDE <- crashes$MPDLONGITUDE <- crashes$MPDGEOX <- crashes$MPDGEOY <- crashes$STREETSEGID <- crashes$ROADWAYSEGID <- crashes$MAR_ADDRESS <- crashes$TODATE <- crashes$FATALPASSENGER <- crashes$MAJORINJURIESPASSENGER <- crashes$UNKNOWNINJURIESPASSENGER <- NULL
+
+View(crashes)
+nrow(crashes)
+```
+
+```{r}
+#doing amelia for passenger data
+library(Amelia)
+am_output <- amelia(crashes, noms = c("FATALPASSENGER"), ords = c("MAJORINJURIESPASSENGER", "MINORINJURIESPASSENGER", "UNKNOWNINJURIESPASSENGER"))
+
+#Amelia Error Code:  38  The following variable(s) are characters: CCN, ROUTEID, ADDRESS, WARD, EVENTID, NEARESTINTROUTEID, NEARESTINTSTREETNAME, INTAPPROACHDIRECTION, BLOCKKEY, SUBBLOCKKEYYou may have wanted to set this as a ID variable to remove it from the imputation model or as an ordinal or nominal variable to be imputed.  Please set it as either and try again. 
+```
+
+```{r}
+crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
+
+
+```
+
+turns out, we actually only needed to do this to the 311 requests. I didn't realize crashes was the data higher on the Y. So disregard the following chunk: 
+
+```{r}
+# crashes %>% 
+#   mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
+#                          "2" = "Ward 2",
+#                          "3" = "Ward 3",
+#                          "4" = "Ward 4",
+#                          "5" = "Ward 5",
+#                          "6" = "Ward 6",
+#                          "7" = "Ward 7",
+#                          "8" = "Ward 8")) ->
+#   crashes
+# head(crashes$WARD)
+```
+
+```{r}
+#omitting all na values - did not work
+#crashes %>% 
+ # na.omit(crashes$WARD) ->
+ # crashes
+```
+
+```{r}
+#library(naniar)
+#crashes %>% 
+  #replace_with_na(replace = WARD(x = NULL)) ->
+  #nona_crashes
+```
+
+```{r}
+#removing all null values
+#no_null <- names(crashes) %in% c("Null")
+#crashes <- crashes[!no_null]
+```
+
+```{r}
+
+requests_fixed_wards <- trafficrequests
+
+requests_fixed_wards %>% 
+  mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
+                         "2" = "Ward 2", 
+                         "3" = "Ward 3",
+                         "4" = "Ward 4",
+                         "5" = "Ward 5",
+                         "6" = "Ward 6",
+                         "7" = "Ward 7",
+                         "8" = "Ward 8")) ->
+  requests_fixed_wards
+head(requests_fixed_wards$WARD)
+
+na.omit(requests_fixed_wards)
+na.omit(crashes) # how do we omit all NULL and NA values?
+```
+
+```{r time_elapsed}
+requests_fixed_wards$time_elapsed <- as.Date(as.character(requests_fixed_wards$SERVICEDUEDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(requests_fixed_wards$RESOLUTIONDATE), format = "%Y-%m-%d")
+View(requests_fixed_wards)
+```
+
+```{r days_to_solve}
+requests_fixed_wards$days_to_solve <- as.Date(as.character(requests_fixed_wards$RESOLUTIONDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(requests_fixed_wards$SERVICEORDERDATE), format = "%Y-%m-%d")
+View(requests_fixed_wards)
+```
+
+```{r}
+crashes <- crashes %>%
+  mutate(INDEX = 1)
+```
+
+
+```{r}
+ggplot() +
+  geom_point(data = requests_fixed_wards, aes(x = ADDDATE), stat = "bin") +
+  geom_smooth(requests_fixed_wards, mapping = aes(x = ADDDATE), stat = "bin") +
+  geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+  facet_wrap(~ WARD, nrow=3)
+```
+
+uses the old trafficrequest frame
+```{r}
+# ggplot() +
+#   geom_point(data = trafficrequests, aes(x = ADDDATE), stat = "bin") +
+#   geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
+#   geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+#   geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+#   facet_wrap(~ WARD, nrow=3)
+```
+
+```{r}
+# ggplot() +
+#   geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+#   geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+#   facet_wrap(~ WARD, nrow=3)
+```
+
+```{r bydate}
+library(tibbletime)
+#frequency_by_date <- create_series('2012' ~ '2019', 'daily', class="Date") %>%
+  #mutate(ward = 1:8)
+
+#frequency_by_date
+
+frequency_by_date <- crashes %>% group_by(FROMDATE) %>%
+  summarise(daily_crashes = sum(crashes))
+
+```
+
+
+
+
+
