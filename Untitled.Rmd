@@ -176,11 +176,79 @@ requests_by_date <- requests_fixed_wards %>% group_by(ADDDATE,WARD) %>%
 
 View(requests_by_date)
 
-frequency_by_date%>% requests_by_date %>%
-  mutate(dailyrequests)
-
+# by_date <- merge(frequency_by_date, requests_by_date, by.frequency_by_date=c("WARD","FROMDATE"), by.requests_by_date = c("WARD","ADDDATE"))
+# head(by_date)
 
 ```
+
+```{r}
+
+by_date <- full_join(frequency_by_date, requests_by_date, by = c('FROMDATE'='ADDDATE', 'WARD'='WARD'))
+View(by_date)
+by_date <- by_date %>% group_by(FROMDATE, WARD) %>% summarize(dailycrashes = sum(dailycrashes), dailyrequests = sum(dailyrequests))
+by_date$dailycrashes[is.na(by_date$dailycrashes)] <- 0
+by_date$dailyrequests[is.na(by_date$dailyrequests)] <- 0
+View(by_date)
+
+```
+
+```{r}
+without_ward <- by_date %>% 
+  group_by(FROMDATE) %>%
+  summarize(dailycrashes = sum(dailycrashes), dailyrequests = sum(dailyrequests))
+View(without_ward)
+```
+
+
+```{r}
+library(moderndive)
+
+first_model <- lm(dailycrashes ~ dailyrequests, data = without_ward)
+get_regression_table(first_model)
+View(first_model)
+
+get_regression_points(first_model)
+
+ggplot(without_ward, aes(y = dailyrequests, x = dailycrashes)) +
+  geom_point() +
+  geom_parallel_slopes(se = FALSE)
+
+# sim1_mod <- lm(dailycrashes ~ dailyrequests, data = by_date, na.action=na.exclude)
+# coef(sim1_mod)
+# 
+# str(sim1_mod)
+
+# grid <- by_date %>% 
+#   data_grid(dailycrashes) 
+# grid
+# 
+# grid <- augment(sim1_mod, newdata = grid)
+# grid
+# 
+# ggplot(sim1, aes(x)) +
+#   geom_point(aes(y = y)) +
+#   geom_line(aes(y = .fitted), data = grid, color = "red", size = 1) +
+#   geom_point(aes(y = .fitted), data = grid, color = "blue", size = 3)
+
+```
+
+```{r}
+df1 = data.frame(CustomerId=c(1:10),
+             Hobby = c(rep("sing", 4), rep("pingpong", 3), rep("hiking", 3)),
+             Product=c(rep("Toaster",3),rep("Phone", 2), rep("Radio",3), rep("Stereo", 2)))
+
+View(df1)
+
+df2 = data.frame(CustomerId=c(2,4,6, 8, 10),State=c(rep("Alabama",2),rep("Ohio",1),   rep("Cal", 2)),
+             like=c("sing", 'hiking', "pingpong", 'hiking', "sing"))
+
+View(df2)
+
+df3 = merge(df1, df2, by.x=c("CustomerId", "Hobby"), by.y=c("CustomerId", "like"))
+
+View(df3)
+```
+
 
 
 
