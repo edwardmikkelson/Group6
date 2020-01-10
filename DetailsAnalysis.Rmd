@@ -1,0 +1,215 @@
+---
+title: "DetailsAnalysisG6"
+author: "Hannah Brown"
+date: "1/7/2020"
+output: html_document
+---
+
+```{r}
+#loading data
+Details <- read.csv("~/Documents/AUJuniorYear/S2020/GOVT496/NoGroup6/Crash_Details_Table.csv")
+```
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+```
+
+
+```{r}
+#summarizing data
+sumDet <- summary(Details)
+sumDet
+```
+
+```{r}
+#table summaries
+#yikes forgot this was continuous lol table(Details$AGE)
+table(Details$INVEHICLETYPE)
+table(Details$LICENSEPLATESTATE)
+```
+
+```{r}
+#filtering out ages that are not relevant
+Details %>% 
+  filter((AGE >= 16)&(AGE <= 93)) ->
+  age1
+summary(age1)
+```
+
+```{r}
+Details %>% 
+  mutate(`FATAL` = recode(FATAL, "N" = 0, 
+                           "Y" = 1 ),
+          `MAJORINJURY` = recode(`MAJORINJURY`, "N" = 0, 
+                                    "Y" = 1 ),
+         `MINORINJURY` = recode(MINORINJURY,"N" = 0, 
+                                       "Y" = 1 ),
+         `TICKETISSUED` = recode(TICKETISSUED,"N" = 0, 
+                                       "Y" = 1 ),
+         `IMPAIRED` = recode(IMPAIRED,"N" = 0, 
+                                       "Y" = 1 ),
+         `SPEEDING` = recode(SPEEDING,"N" = 0, 
+                                       "Y" = 1 )) ->
+  Details1
+```
+
+```{r}
+#filtering out ages that are not relevant
+Details1 %>% 
+  filter((AGE >= 16)&(AGE <= 93)) ->
+  Details1
+```
+
+```{r}
+#filtering out ages that are not relevant
+Details1 %>% 
+  filter((LICENSEPLATESTATE == "MD")|(LICENSEPLATESTATE == "VA")|(LICENSEPLATESTATE == "DC")) ->
+  Details1
+summary(Details1)
+```
+
+```{r}
+#plotting relevant ages
+ggplot(Details1 = Details1, mapping = aes(x = Details1$AGE, fill = Details1$LICENSEPLATESTATE)) +
+  geom_histogram( bins = 20)
+```
+
+```{r}
+Details1 %>% 
+  ggplot(data = Details1, mapping = aes(x = LICENSEPLATESTATE)) +
+  geom_bar()
+```
+
+```{r}
+Details1 %>% 
+  ggplot(data = Details1, mapping = aes(INVEHICLETYPE, fill = FATAL), par(las = 2)) +
+  geom_bar(position = "stack")
+```
+
+```{r}
+Details %>% 
+  ggplot(data = Details, mapping = aes(PERSONTYPE)) +
+  geom_bar(position = "stack", las = 2)
+```
+
+
+```{r}
+Details1 %>% 
+  ggplot(data = Details1, mapping = aes(PERSONTYPE, FATAL, color = LICENSEPLATESTATE)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE)
+```
+
+
+```{r}
+Details1 %>% 
+  ggplot(data = Details1, mapping = aes(x = MAJORINJURY,  y = AGE, color = IMPAIRED)) +
+  geom_bar(stat = "identity")
+```
+
+
+
+#Set Up
+```{r}
+library(readr)
+library(dplyr)
+library(here)
+library(MCMCpack)
+library(glmnet)
+library(parsnip)
+```
+
+#Estimate Bayesian Logistic Regression
+
+Est of Bayesian logistic regression
+```{r}
+mc_post <- MCMClogit(FATAL ~ 1, data = Details1)
+summary(mc_post)
+```
+
+Modeling fuller Bayesian model
+```{r}
+mc_post_full <- MCMClogit(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE, data = Details1, burnin = 500, mcmc = 2000, thin = 2)
+summary(mc_post_full)
+```
+
+Highest posterior density intervals for the coef
+```{r}
+HPDinterval(mc_post_full) -> mc_int
+mc_int
+```
+
+```{r}
+pdf("mcmc_Details.pdf")
+plot(mc_post_full)
+dev.off()
+```
+
+Posterior Probability Calculation- What is the posterior probability the `Neighbors` postcard has a larger coefficient than the `Hawthorne` card?
+```{r}
+mean(mc_post_full[, "MINORINJURY"] < mc_post_full[, "MAJORINJURY"])
+```
+
+Estimate Machine Learning Models
+
+`X` is a raw numeric matrix; `y` is a raw numeric vector
+```{r}
+predictors <- c("MAJORINJURY", "MINORINJURY", "TICKETISSUED", "IMPAIRED", "SPEEDING", "AGE")
+
+X <- Details1[, predictors]
+```
+
+Feature engineering
+```{r}
+X <- X %>% mutate(age2 = AGE^2,
+                  age3 = AGE^3,
+                  age4 = AGE^4,
+                  age5 = AGE^5) %>%
+  as.matrix()
+
+y <- Details1[, "FATAL"] %>% unlist %>% as.numeric()
+```
+
+Est LS model
+```{r}
+lm_out <- lm(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE + 
+            I(AGE^2) + I(AGE^3) + I(AGE^4) + I(AGE^5),
+             data = Details1)
+coefs_lm <- coef(lm_out)
+summary(lm_out)
+```
+
+Estimate with LASSO
+```{r}
+lasso_out <- glmnet(X, y, alpha = 1)
+lasso_out
+```
+
+How to choose coefs? Use cross-validation to see which predicts best in `out-of-sample` tests. 
+```{r}
+set.seed(281) #train-test sets are consistent across implementations
+cv_lasso_out <- cv.glmnet(X, y, alpha = 1)
+```
+
+Show best coefs for the model, the one with the min deviance
+```{r}
+coef(cv_lasso_out, s = "lambda.min")
+```
+
+Lamda within in 1 SE of the min
+```{r}
+coef(cv_lasso_out, s = "lambda.1se")
+```
+
+```{r}
+coefs_lasso <- coef(cv_lasso_out, s = "lambda.1se")
+```
+
+```{r}
+cbind(coefs_lasso, coefs_lm)
+```
+
+
+
