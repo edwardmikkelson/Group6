@@ -125,6 +125,11 @@ View(requests_fixed_wards)
 ```{r}
 crashes <- crashes %>%
   mutate(INDEX = 1)
+View(crashes)
+
+requests_fixed_wards <- requests_fixed_wards %>%
+  mutate(INDEX = 1)
+View(requests_fixed_wards)
 ```
 
 
@@ -161,8 +166,19 @@ library(tibbletime)
 
 #frequency_by_date
 
-frequency_by_date <- crashes %>% group_by(FROMDATE) %>%
-  summarise(daily_crashes = sum(crashes))
+frequency_by_date <- crashes %>% group_by(FROMDATE,WARD) %>%
+  summarise(dailycrashes = sum(INDEX))
+
+View(frequency_by_date)
+
+requests_by_date <- requests_fixed_wards %>% group_by(ADDDATE,WARD) %>%
+  summarise(dailyrequests = sum(INDEX))
+
+View(requests_by_date)
+
+frequency_by_date%>% requests_by_date %>%
+  mutate(dailyrequests)
+
 
 ```
 
