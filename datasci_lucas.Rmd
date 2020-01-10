@@ -1,6 +1,6 @@
 ---
-title: "calldata"
-author: "Hannah Brown"
+title: "Lucas' Data Sci Stuff"
+author: "Lucas Anderton"
 date: "1/9/2020"
 output: html_document
 ---
@@ -13,18 +13,15 @@ library(ggplot2)
 
 
 ```{r}
-crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
-threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
-head(threeoneone)
+# crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+# threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+# head(threeoneone)
 
 ```
 
 ```{r}
 trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
 head(trafficrequests)
-
-trafficrequests %>% 
-  mutate(WARD = replace(x= WARD, 7, "Ward 7"))
 ```
 
 ```{r}
@@ -36,14 +33,13 @@ summary(is.na(crashes))
 # throw out columns
 crashes$LOCATIONERROR <- crashes$LASTUPDATEDATE <- crashes$MPDLATITUDE <- crashes$MPDLONGITUDE <- crashes$MPDGEOX <- crashes$MPDGEOY <- crashes$STREETSEGID <- crashes$ROADWAYSEGID <- crashes$MAR_ADDRESS <- crashes$TODATE <- crashes$FATALPASSENGER <- crashes$MAJORINJURIESPASSENGER <- crashes$UNKNOWNINJURIESPASSENGER <- NULL
 
-View(crashes)
 nrow(crashes)
 ```
 
 ```{r}
 #doing amelia for passenger data
-library(Amelia)
-am_output <- amelia(crashes, noms = c("FATALPASSENGER"), ords = c("MAJORINJURIESPASSENGER", "MINORINJURIESPASSENGER", "UNKNOWNINJURIESPASSENGER"))
+# library(Amelia)
+# am_output <- amelia(crashes, noms = c("FATALPASSENGER"), ords = c("MAJORINJURIESPASSENGER", "MINORINJURIESPASSENGER", "UNKNOWNINJURIESPASSENGER"))
 
 #Amelia Error Code:  38  The following variable(s) are characters: CCN, ROUTEID, ADDRESS, WARD, EVENTID, NEARESTINTROUTEID, NEARESTINTSTREETNAME, INTAPPROACHDIRECTION, BLOCKKEY, SUBBLOCKKEYYou may have wanted to set this as a ID variable to remove it from the imputation model or as an ordinal or nominal variable to be imputed.  Please set it as either and try again. 
 ```
@@ -108,6 +104,7 @@ head(requests_fixed_wards$WARD)
 
 na.omit(requests_fixed_wards)
 na.omit(crashes) # how do we omit all NULL and NA values?
+
 ```
 
 ```{r time_elapsed}
@@ -166,50 +163,73 @@ library(tibbletime)
 
 #frequency_by_date
 
-frequency_by_date <- crashes %>% group_by(FROMDATE,WARD) %>%
+crashes_by_date <- crashes %>% group_by(FROMDATE,WARD) %>%
   summarise(dailycrashes = sum(INDEX))
 
-View(frequency_by_date)
+# crashes_by_date %>% mutate(
+#   group_by(requests_fixed_wards$ADDDATE,requests_fixed_wards$WARD) %>%
+#   summarise(dailyrequests = sum(requests_fixed_wards$INDEX))
+#   )
+
+View(crashes_by_date)
 
 requests_by_date <- requests_fixed_wards %>% group_by(ADDDATE,WARD) %>%
   summarise(dailyrequests = sum(INDEX))
 
+str(requests_by_date)
+
 View(requests_by_date)
 
-# by_date <- merge(frequency_by_date, requests_by_date, by.frequency_by_date=c("WARD","FROMDATE"), by.requests_by_date = c("WARD","ADDDATE"))
+requests_by_date <- requests_by_date %>% mutate(NEWDATE = as.Date(ADDDATE))
+crashes_by_date <- crashes_by_date %>% mutate(NEWDATE = as.Date(FROMDATE))
+
+# by_date <- merge(crashes_by_date, requests_by_date, by.crashes_by_date=c("WARD","FROMDATE"), by.requests_by_date = c("WARD","ADDDATE"))
 # head(by_date)
 
 ```
 
 ```{r}
-
-by_date <- full_join(frequency_by_date, requests_by_date, by = c('FROMDATE'='ADDDATE', 'WARD'='WARD'))
+by_date <- inner_join(crashes_by_date, requests_by_date, by = c('NEWDATE', 'WARD'))
 View(by_date)
-by_date <- by_date %>% group_by(FROMDATE, WARD) %>% summarize(dailycrashes = sum(dailycrashes), dailyrequests = sum(dailyrequests))
 by_date$dailycrashes[is.na(by_date$dailycrashes)] <- 0
 by_date$dailyrequests[is.na(by_date$dailyrequests)] <- 0
+
+## ^^ origin of this code
+
+
 View(by_date)
 
 ```
 
+Origin of NA elimination code above. [link](https://stackoverflow.com/questions/13172711/replace-na-values-from-a-column-with-0-in-data-frame-r)
+```
+a$x[a$x==NA]<-0;
+a[,c("x")]<-apply(a[,c("x")],1,function(z){replace(z, is.na(z), 0)});
+a$x[is.na(a$x),]<-0;
+```
+
 ```{r}
 without_ward <- by_date %>% 
-  group_by(FROMDATE) %>%
+  group_by(NEWDATE) %>%
   summarize(dailycrashes = sum(dailycrashes), dailyrequests = sum(dailyrequests))
 View(without_ward)
+
+# TEST YOUR MERGE
+greater_than_one <- without_ward %>% filter(dailycrashes !=0 & dailyrequests != 0) 
+View(greater_than_one)
 ```
 
 
 ```{r}
 library(moderndive)
 
-first_model <- lm(dailycrashes ~ dailyrequests, data = without_ward)
+first_model <- lm(dailyrequests ~ dailycrashes, data = without_ward)
 get_regression_table(first_model)
 View(first_model)
 
 get_regression_points(first_model)
 
-ggplot(without_ward, aes(y = dailyrequests, x = dailycrashes)) +
+ggplot(greater_than_one, aes(y = dailycrashes, x = dailyrequests)) +
   geom_point() +
   geom_parallel_slopes(se = FALSE)
 
@@ -233,20 +253,20 @@ ggplot(without_ward, aes(y = dailyrequests, x = dailycrashes)) +
 ```
 
 ```{r}
-df1 = data.frame(CustomerId=c(1:10),
-             Hobby = c(rep("sing", 4), rep("pingpong", 3), rep("hiking", 3)),
-             Product=c(rep("Toaster",3),rep("Phone", 2), rep("Radio",3), rep("Stereo", 2)))
-
-View(df1)
-
-df2 = data.frame(CustomerId=c(2,4,6, 8, 10),State=c(rep("Alabama",2),rep("Ohio",1),   rep("Cal", 2)),
-             like=c("sing", 'hiking', "pingpong", 'hiking', "sing"))
-
-View(df2)
-
-df3 = merge(df1, df2, by.x=c("CustomerId", "Hobby"), by.y=c("CustomerId", "like"))
-
-View(df3)
+# df1 = data.frame(CustomerId=c(1:10),
+#              Hobby = c(rep("sing", 4), rep("pingpong", 3), rep("hiking", 3)),
+#              Product=c(rep("Toaster",3),rep("Phone", 2), rep("Radio",3), rep("Stereo", 2)))
+# 
+# View(df1)
+# 
+# df2 = data.frame(CustomerId=c(2,4,6, 8, 10),State=c(rep("Alabama",2),rep("Ohio",1),   rep("Cal", 2)),
+#              like=c("sing", 'hiking', "pingpong", 'hiking', "sing"))
+# 
+# View(df2)
+# 
+# df3 = merge(df1, df2, by.x=c("CustomerId", "Hobby"), by.y=c("CustomerId", "like"))
+# 
+# View(df3)
 ```
 
 
