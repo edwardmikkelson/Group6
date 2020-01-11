@@ -1,13 +1,13 @@
 ---
 title: "DetailsAnalysisG6"
-author: "Hannah Brown"
+author: "Group 6"
 date: "1/7/2020"
 output: html_document
 ---
 
 ```{r}
 #loading data
-Details <- read.csv("~/Documents/AUJuniorYear/S2020/GOVT496/NoGroup6/Crash_Details_Table.csv")
+Details <- read.csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
 ```
 
 ```{r}

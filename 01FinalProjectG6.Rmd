@@ -17,8 +17,10 @@ The literature says...
 This is why it's important... 
 
 ## Data Collection Procedure
--Open Data DC: Crash data and Details data
--Merge?
+- Started with OpenDataDC's `crashes` dataset.
+- Explored related `crashdetails` in a relational table.
+  - Using that for additional data on a subset of the DC crashes. 
+- Summarized 311 Requests `threeoneonerequestts` and `crashes` by count per day. 
 
 ## Interesting Features and Data Processing 
 - Crashes has 223990 observations and 60 columns 
@@ -28,8 +30,8 @@ This is why it's important...
 - The full dataset reaches back until 1975
 
 ## Methods
--recode major and minor injuries
--recode person to numerical
+- Recode major and minor injuries; 
+-ecode person to numerical
 -recode ticketissued to numerical
 -recode speeding to numerical
 
