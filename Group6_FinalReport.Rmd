@@ -166,6 +166,11 @@ ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) +
   geom_point() + 
   geom_parallel_slopes(se = FALSE)
 
+```
+
+<!-- creates another linear regression model but shows it as a residual plot.  -->
+```{r}
+
 fit <- lm(dailyrequests ~ dailycrashes, data = without_ward)
 without_ward$predicted <- predict(fit)   # Save the predicted values
 without_ward$residuals <- residuals(fit)
@@ -187,11 +192,6 @@ ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) +
   theme_bw()
 
 ```
-
-```{r include=FALSE}
-
-```
-
 
 <!-- Hannah should put most of her code here -->
 
