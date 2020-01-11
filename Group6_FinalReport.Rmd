@@ -66,12 +66,10 @@ crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
 # gives a new variable, INDEX, and assigns every row a 1 for counting purposes. 
 crashes <- crashes %>%
   mutate(INDEX = 1)
-View(crashes)
 
 #same as above
 trafficrequests <- trafficrequests %>%
   mutate(INDEX = 1)
-View(trafficrequests)
 ```
 
 ```{r}
@@ -95,13 +93,13 @@ na.omit(crashes) # how do we omit all NULL and NA values?
 ```{r time_elapsed}
 trafficrequests$time_elapsed <- as.Date(as.character(trafficrequests$SERVICEDUEDATE), format= "%Y-%m-%d") -
   as.Date(as.character(trafficrequests$RESOLUTIONDATE), format = "%Y-%m-%d")
-View(trafficrequests)
+
 ```
 
 ```{r days_to_solve}
 trafficrequests$days_to_solve <- as.Date(as.character(trafficrequests$RESOLUTIONDATE), format= "%Y-%m-%d") -
   as.Date(as.character(trafficrequests$SERVICEORDERDATE), format = "%Y-%m-%d")
-View(trafficrequests)
+
 ```
 
 ```{r}
@@ -128,6 +126,20 @@ requests_by_date <- requests_by_date %>% mutate(NEWDATE = as.Date(ADDDATE))
 crashes_by_date <- crashes_by_date %>% mutate(NEWDATE = as.Date(FROMDATE))
 ```
 
+
+```{r}
+by_date <- inner_join(crashes_by_date, requests_by_date, by = c('NEWDATE', 'WARD'))
+
+by_date$dailycrashes[is.na(by_date$dailycrashes)] <- 0
+by_date$dailyrequests[is.na(by_date$dailyrequests)] <- 0
+#by_date_with_time <- inner_join(by_date, elapsed_by_date, by = c('NEWDATE','WARD'))
+
+
+## ^^ origin of this code
+
+```
+
+
 ```{r}
 # joined the two tibbles seeking out matching values in BOTH 'NEWDATE' and 'WARD'. 
 grouped_by_date <- inner_join(crashes_by_date, requests_by_date, by = c('NEWDATE', 'WARD'))
@@ -149,10 +161,6 @@ without_ward <- by_date %>%
 ```
 
 
-
-
-
-
 # 4 Statistical Methods
 
 ```{r}
@@ -161,10 +169,10 @@ library(GGally)
 
 # do we want this? 
 #ggpairs(data=by_date, columns=c(2,3,4,6), title="Running Models on Each Pair of Variables")
-
+pdf(file= "/Users/eddie/Desktop/Plot.pdf")
 first_model <- lm(dailyrequests ~ dailycrashes, data = without_ward)
 get_regression_table(first_model)
-View(first_model)
+
 
 get_regression_points(first_model)
 
@@ -180,7 +188,7 @@ ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) +
 fit <- lm(dailyrequests ~ dailycrashes, data = without_ward)
 without_ward$predicted <- predict(fit)   # Save the predicted values
 without_ward$residuals <- residuals(fit)
-
+summary(fit)
 # Quick look at the actual, predicted, and residual values
 without_ward %>% select(dailyrequests, predicted, residuals) %>% head()
 
@@ -196,7 +204,7 @@ ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) +
 
   geom_point(aes(y = predicted), shape = 1) +
   theme_bw()
-
+dev.off()
 ```
 
 ## My attempt at migrating Hannah's code (btw, I search-and-replaced every occurrence of `Details` for `details_and_wards`. Hope that doesn't mess it up!)
