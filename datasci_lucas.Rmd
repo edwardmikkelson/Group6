@@ -13,9 +13,9 @@ library(ggplot2)
 
 
 ```{r}
-# crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
-# threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
-# head(threeoneone)
+crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+head(threeoneone)
 
 ```
 

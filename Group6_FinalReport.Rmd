@@ -32,9 +32,168 @@ crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f6
 threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
 ```
 
+
+
 # 3 Important/Interesting Facets of Data Processing
 
+```{r}
+# sorts out the three types of service codes applicable to traffic data
+trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
+head(trafficrequests)
+```
+
+```{r}
+crashes$WARD[crashes$WARD == "Null"] <- NA
+
+summary(is.na(crashes))
+#crashes2 <- na.omit(crashes)
+
+# throw out columns
+crashes$LOCATIONERROR <- crashes$LASTUPDATEDATE <- crashes$MPDLATITUDE <- crashes$MPDLONGITUDE <- crashes$MPDGEOX <- crashes$MPDGEOY <- crashes$STREETSEGID <- crashes$ROADWAYSEGID <- crashes$MAR_ADDRESS <- crashes$TODATE <- crashes$FATALPASSENGER <- crashes$MAJORINJURIESPASSENGER <- crashes$UNKNOWNINJURIESPASSENGER <- NULL
+
+# sets the 2012 starting line for crashes data since it goes back early
+crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
+
+```
+
+```{r}
+# gives a new variable, INDEX, and assigns every row a 1 for counting purposes. 
+crashes <- crashes %>%
+  mutate(INDEX = 1)
+View(crashes)
+
+#same as above
+trafficrequests <- trafficrequests %>%
+  mutate(INDEX = 1)
+View(trafficrequests)
+```
+
+```{r}
+# fixes ward number problem. Some requests were labeled integers, but all the crashes data was 'Ward X' 
+trafficrequests %>% 
+  mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
+                         "2" = "Ward 2", 
+                         "3" = "Ward 3",
+                         "4" = "Ward 4",
+                         "5" = "Ward 5",
+                         "6" = "Ward 6",
+                         "7" = "Ward 7",
+                         "8" = "Ward 8")) ->
+  trafficrequests
+head(trafficrequests$WARD)
+
+na.omit(trafficrequests)
+na.omit(crashes) # how do we omit all NULL and NA values?
+```
+
+```{r time_elapsed}
+trafficrequests$time_elapsed <- as.Date(as.character(trafficrequests$SERVICEDUEDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(trafficrequests$RESOLUTIONDATE), format = "%Y-%m-%d")
+View(trafficrequests)
+```
+
+```{r days_to_solve}
+trafficrequests$days_to_solve <- as.Date(as.character(trafficrequests$RESOLUTIONDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(trafficrequests$SERVICEORDERDATE), format = "%Y-%m-%d")
+View(trafficrequests)
+```
+
+```{r}
+# plots the frequency of traffic requests and crashes by date, faceted with wards using bins (it defaults to like 30 values binned into a single point). 
+ggplot() +
+  geom_point(data = trafficrequests, aes(x = ADDDATE), stat = "bin") +
+  geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
+  geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+  facet_wrap(~ WARD, nrow=3)
+```
+
+```{r}
+# creates frequency tibble for crashes on each day
+crashes_by_date <- crashes %>% group_by(FROMDATE,WARD) %>%
+  summarise(dailycrashes = sum(INDEX))
+
+# creates frequency tibble for 311 requests on each day
+requests_by_date <- trafficrequests %>% group_by(ADDDATE,WARD) %>%
+  summarise(dailyrequests = sum(INDEX))
+
+# changes the head of FROMDATE in crashes and ADDDATE in requests to NEWDATE
+requests_by_date <- requests_by_date %>% mutate(NEWDATE = as.Date(ADDDATE))
+crashes_by_date <- crashes_by_date %>% mutate(NEWDATE = as.Date(FROMDATE))
+```
+
+```{r}
+# joined the two tibbles seeking out matching values in BOTH 'NEWDATE' and 'WARD'. 
+grouped_by_date <- inner_join(crashes_by_date, requests_by_date, by = c('NEWDATE', 'WARD'))
+
+# looks for NA. If TRUE, sets to zero. 
+by_date$dailycrashes[is.na(by_date$dailycrashes)] <- 0
+by_date$dailyrequests[is.na(by_date$dailyrequests)] <- 0
+```
+
+```{r}
+# for the first regression, we want to do it without that extra ward variable. This does that by grouping by date and merging all wards. 
+without_ward <- by_date %>% 
+  group_by(NEWDATE) %>%
+  summarize(dailycrashes = sum(dailycrashes), dailyrequests = sum(dailyrequests))
+
+# this just makes sure the rows joined properly. 
+#greater_than_one <- by_date %>% filter(dailycrashes !=0 & dailyrequests != 0) 
+#View(greater_than_one)
+```
+
+
+
+
+
+
 # 4 Statistical Methods
+
+```{r}
+library(moderndive)
+library(GGally)
+
+# do we want this? 
+#ggpairs(data=by_date, columns=c(2,3,4,6), title="Running Models on Each Pair of Variables")
+
+first_model <- lm(dailyrequests ~ dailycrashes, data = without_ward)
+get_regression_table(first_model)
+View(first_model)
+
+get_regression_points(first_model)
+
+ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) + 
+  geom_point() + 
+  geom_parallel_slopes(se = FALSE)
+
+fit <- lm(dailyrequests ~ dailycrashes, data = without_ward)
+without_ward$predicted <- predict(fit)   # Save the predicted values
+without_ward$residuals <- residuals(fit)
+
+# Quick look at the actual, predicted, and residual values
+without_ward %>% select(dailyrequests, predicted, residuals) %>% head()
+
+ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) +
+  geom_smooth(method = "lm", se = FALSE, color = "lightgrey") +
+  geom_segment(aes(xend = dailyrequests, yend = predicted), alpha = .2) +
+
+  # > Color AND size adjustments made here...
+  geom_point(aes(color = abs(residuals), size = abs(residuals))) + # size also mapped
+  scale_color_continuous(low = "black", high = "red") +
+  guides(color = FALSE, size = FALSE) +  # Size legend also removed
+  # <
+
+  geom_point(aes(y = predicted), shape = 1) +
+  theme_bw()
+
+```
+
+```{r include=FALSE}
+
+```
+
+
+<!-- Hannah should put most of her code here -->
 
 # 5 Analysis of Results
 

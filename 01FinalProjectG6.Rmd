@@ -9,32 +9,100 @@ output:
 urlcolor: "blue"
 ---
 
-## Question
-For every additional 311 request in a particular, what is the effect on frequency of crashes?
-How does the average latency between requested date and due date differ between wards?
-Estimation of fatalities from historically documented characteristics of driving patterns?
-The literature says...
-This is why it's important... 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+```
+
+## Traffic in DC
+[Washington Post, 2011](https://www.washingtonpost.com/local/2011/09/26/gIQAtzij0K_story.html): “D.C. area is No. 1 nationwide in traffic congestion, study says”
+
+[Washington Post, 2019](https://www.washingtonpost.com/local/trafficandcommuting/its-a-waste-of-time-washington-is-no-3-in-traffic-congestion-study-says/2019/08/22/e6602e0e-c4d6-11e9-b72f-b31dfaa77212_story.html): “Washington is No. 3 in traffic congestion, study says”
+
+<!-- We were investigating this OpenData DC dataset that listed DC crashes, primarily from around 2010 to the present. Over time, the amount of crashes in DC skyrocketed. That instantly registered to us as: Oh, well, population went up! So traffic went up and crashes went up. We were researching traffic in DC, and these two articles were the first results. We wanted to see what kind of relationship traffic volume increase or population increase had on crashes. DC traffic data is only registered by meters on certain street sections. It was massive amounts of data, split up into annual datasets and it was hard to establish the growth over time, mostly because of a change in the number of meeters. Then we found DC’s 311 request datasets from 2012 onwards, and we figured this could be relevant in two ways if we could narrow it down to just 311 requests involving the roads: one, 311 requests likely scaled with DC’s driving population, and two, areas that had more 311 traffic requests probably had worse road and navigation conditions and led to more accidents.  This data shared an important variable that was important for data wrangling, but also prompted additional questions to consider -- the ward the accidents and 311 requests happened in.  -->
+
+## Research Questions
+Is there a relationship between...
+
+1. 311 traffic requests and the frequency of crashes in D.C.?
+2. Rising latency in resolution times and the frequency of crashes?
+
+Do crashes occur more in geographic areas with more 311 requests?
+
+What factors are most significant in estimating the likelihood of a fatality in a crash?
 
 ## Data Collection Procedure
-- Started with OpenDataDC's `crashes` dataset.
-- Explored related `crashdetails` in a relational table.
-  - Using that for additional data on a subset of the DC crashes. 
-- Summarized 311 Requests `threeoneonerequestts` and `crashes` by count per day. 
+- Categorical, descriptive crash data had analytical shortcomings. 
+- OpenDataDC's `crashes` dataset was thorough and contained mostly boolean values (True/False; Yes/No).
+- Explored related `crashdetails` which is a relational table.
+  - Utilizing that for additional data on a subset of the DC crashes. 
+- Summarized 311 Requests `threeoneonerequestts` and `crashes` by count per day.
+  - Eventually merged these into a single tibble, grouped by date and ward.
+  
+```
+Details <- read.csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
+crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+```
+## Initial Processing
+- Filtering out unnecessary variables(columns) in all three frames
+- Lining up start and end dates of data
 
-## Interesting Features and Data Processing 
+```crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")```
+
+- Filtering 311 requests down to traffic-related requests
+
+```trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))```
+
+## Crash Data Tidbits
 - Crashes has 223990 observations and 60 columns 
 - Details has 443867 observations and 15 variables
 - Ages beginning at -7990 and ranged up to 237
 - License plate `None` produced a high number of crashes in the data set
 - The full dataset reaches back until 1975
 
+## Wrangling Into Counts
+Creates new variable, `INDEX`, and assigns every row `1` for counting purposes.
+```
+crashes <- crashes %>%
+  mutate(INDEX = 1)
+```
+
+Frequency tibble for crashes on each day
+
+```
+crashes_by_date <- crashes %>% group_by(FROMDATE,WARD) %>%
+  summarise(dailycrashes = sum(INDEX))
+```
+
+Frequency tibble for 311 requests on each day
+
+```
+requests_by_date <- trafficrequests %>% group_by(ADDDATE,WARD) %>%
+  summarise(dailyrequests = sum(INDEX)) <-- using those index values from earlier
+```
+
+## Linear Regression on Frequency
+Modeling the relationship between frequency of 311 requests and crashes
+
 ## Methods
-- Recode major and minor injuries; 
--ecode person to numerical
--recode ticketissued to numerical
--recode speeding to numerical
+- Recoding data from categorical to binary for use in regression models
+- Ran a series of exploratory models with `ggplot`
+- Mapped geospatial data with `ggmap` and Google API
+- Used clustering algorithm on geospatial data to find groupings
+
 
 ## Analysis
+-Regression model for 311 requests and traffic incidents 
+-Tested model on training data and found consistent results
+
 
 ## Future Implications
+- Opportunity to analyze particularly dangerous intersections
+- Increase usage of 311 complaints to address traffic and transportation concerns
+- Importance of responding to 311 requests
+- Increase pedestrian safety infrastructure in crash-dense areas
+- No snowmobiles?
