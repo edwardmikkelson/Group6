@@ -8,6 +8,11 @@ library(data.table)
 library(ggrepel)
 library(tidyverse)
 library("ggmap")
+library(broom)
+
+#API key: AIzaSyA3nim7i8YYK3_Bkz9oqFW1Vcg0rXDG7lY
+#if(!requireNamespace("devtools")) install.packages("devtools")
+#devtools::install_github("dkahle/ggmap", ref = "tidyup", force=TRUE)
 
 
 # data --------------------------------------------------------------------
@@ -134,27 +139,92 @@ dcmap_swse_311_crashes <- dcmap_swse + geom_point(data = threeoneone_2, aes(x = 
 
 dcmap_swse_311_crashes
 
-# clustering  -------------------------------------------------------
 
-library(dbscan)
+# crash data clustering  -------------------------------------------------------
 
-#wrangle coordinates
+
+library(broom)
+
+# library(sp)
+# library(rgdal)
+# library(geosphere)
+#vcrashxy <- SpatialPointsDataFrame(matrix(c(crashx,crashy), ncol = 2), data.frame(ID = seq(1:length(crashx))), proj4string = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84"))
+
+#crashm <- distm(crashxy, fun = distGeo)
+
+#hc <- hclust(as.dist(crashmd), method = "complete")
+
+# #dbscan
+# 
+# library(dbscan)
+# 
+# dbscan(crashxy, eps = .03, minPts = 5)
 
 crashdata <- crashdata %>% filter( X > -77.11, X < -76.89)
 crashdata <- crashdata %>% filter( Y < 39, Y > 38.7)
-
-#create new xy matrix
 
 crashx <- crashdata$X
 crashy <- crashdata$Y 
 
 crashxy <- matrix(c(crashx,crashy), ncol = 2)
 
-# kmeans cluster (bad)
 
-crash_clusterinfo <- kmeans(crashxy, 8)
+#cluster
 
-crashdata <- crash_clusterinfo$cluster
+crash_clusterinfo_8 <- kmeans(crashxy, 8)
 
-plot(crashxy, col = crash_clusterinfo$cluster)
-points(crash_clusterinfo$centers, col = 1:4, pch = 8, cex = 2)
+crash_clusterinfo_15 <- kmeans(crashxy, 15)
+
+#quickly plot cluster
+
+plot(crashxy, col = crash_clusterinfo_8$cluster)
+
+#add cluster data to coordinate
+
+crashxy_8 <- augment(crash_clusterinfo_8, crashxy)
+crashxy_15 <- augment(crash_clusterinfo_15, crashxy)
+
+
+dcmap_crash_kcluster_8 <- dcmap + geom_point(data = crashxy_8, aes(x = crashxy_8$X1, y = crashxy_8$X2, 
+                                                                   color = crashxy_8$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none")
+
+dcmap_crash_kcluster_8
+
+dcmap_crash_kcluster_15 <- dcmap + geom_point(data = crashxy_15, aes(x = crashxy_15$X1, y = crashxy_15$X2, 
+                                                                     color = crashxy_15$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none")
+
+dcmap_crash_kcluster_15
+
+
+# threeoneone cluster -----------------------------------------------------
+
+threeoneonex <- threeoneone_2$LATITUDE
+threeoneoney <- threeoneone_2$LONGITUDE
+
+threeoneonexy <- matrix(c(threeoneonex,threeoneoney), ncol = 2)
+
+#cluster
+
+threeoneone_cluster_8 <- kmeans(threeoneonexy, 8)
+threeoneone_cluster_15 <- kmeans(threeoneonexy, 15)
+
+#quick plot
+
+plot(threeoneonexy, col = threeoneone_cluster_8$cluster)
+
+#add cluster data to coordinates
+
+threeoneonexy_8 <- augment(threeoneone_cluster_8, threeoneonexy)
+
+threeoneonexy_8
+
+threeoneonexy_15 <- augment(threeoneone_cluster_15, threeoneonexy)
+
+dcmap_threeoneone_kcluster_8 <- dcmap + geom_point(data = threeoneonexy_8, aes(x = threeoneonexy_8$X1, y = threeoneonexy_8$X2, color = threeoneonexy_8$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none")
+
+dcmap_threeoneone_kcluster_8
+
+dcmap_threeoneone_kcluster_15 <- dcmap + geom_point(data = threeoneonexy_15, aes(x = threeoneonexy_15$X1, y = threeoneonexy_15$X2, color = threeoneonexy_15$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none")
+
+dcmap_threeoneone_kcluster_15
+
