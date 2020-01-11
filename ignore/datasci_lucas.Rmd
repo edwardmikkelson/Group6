@@ -1,0 +1,346 @@
+---
+title: "Lucas' Data Sci Stuff"
+author: "Lucas Anderton"
+date: "1/9/2020"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+```
+
+
+```{r}
+# crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+# threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+# head(threeoneone)
+
+```
+
+```{r}
+trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
+head(trafficrequests)
+```
+
+```{r}
+crashes$WARD[crashes$WARD == "Null"] <- NA
+
+summary(is.na(crashes))
+#crashes2 <- na.omit(crashes)
+
+# throw out columns
+crashes$LOCATIONERROR <- crashes$LASTUPDATEDATE <- crashes$MPDLATITUDE <- crashes$MPDLONGITUDE <- crashes$MPDGEOX <- crashes$MPDGEOY <- crashes$STREETSEGID <- crashes$ROADWAYSEGID <- crashes$MAR_ADDRESS <- crashes$TODATE <- crashes$FATALPASSENGER <- crashes$MAJORINJURIESPASSENGER <- crashes$UNKNOWNINJURIESPASSENGER <- NULL
+
+nrow(crashes)
+```
+
+```{r}
+#doing amelia for passenger data
+# library(Amelia)
+# am_output <- amelia(crashes, noms = c("FATALPASSENGER"), ords = c("MAJORINJURIESPASSENGER", "MINORINJURIESPASSENGER", "UNKNOWNINJURIESPASSENGER"))
+
+#Amelia Error Code:  38  The following variable(s) are characters: CCN, ROUTEID, ADDRESS, WARD, EVENTID, NEARESTINTROUTEID, NEARESTINTSTREETNAME, INTAPPROACHDIRECTION, BLOCKKEY, SUBBLOCKKEYYou may have wanted to set this as a ID variable to remove it from the imputation model or as an ordinal or nominal variable to be imputed.  Please set it as either and try again. 
+```
+
+```{r}
+crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
+```
+
+turns out, we actually only needed to do this to the 311 requests. I didn't realize crashes was the data higher on the Y. So disregard the following chunk: 
+
+```{r}
+# crashes %>% 
+#   mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
+#                          "2" = "Ward 2",
+#                          "3" = "Ward 3",
+#                          "4" = "Ward 4",
+#                          "5" = "Ward 5",
+#                          "6" = "Ward 6",
+#                          "7" = "Ward 7",
+#                          "8" = "Ward 8")) ->
+#   crashes
+# head(crashes$WARD)
+```
+
+```{r}
+#omitting all na values - did not work
+#crashes %>% 
+ # na.omit(crashes$WARD) ->
+ # crashes
+```
+
+```{r}
+#library(naniar)
+#crashes %>% 
+  #replace_with_na(replace = WARD(x = NULL)) ->
+  #nona_crashes
+```
+
+```{r}
+#removing all null values
+#no_null <- names(crashes) %in% c("Null")
+#crashes <- crashes[!no_null]
+```
+
+```{r}
+
+requests_fixed_wards <- trafficrequests
+
+requests_fixed_wards %>% 
+  mutate(`WARD` = recode(WARD, "1" = "Ward 1", 
+                         "2" = "Ward 2", 
+                         "3" = "Ward 3",
+                         "4" = "Ward 4",
+                         "5" = "Ward 5",
+                         "6" = "Ward 6",
+                         "7" = "Ward 7",
+                         "8" = "Ward 8")) ->
+  requests_fixed_wards
+head(requests_fixed_wards$WARD)
+
+na.omit(requests_fixed_wards)
+na.omit(crashes) # how do we omit all NULL and NA values?
+
+```
+
+```{r time_elapsed}
+requests_fixed_wards$time_elapsed <- as.Date(as.character(requests_fixed_wards$SERVICEDUEDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(requests_fixed_wards$RESOLUTIONDATE), format = "%Y-%m-%d")
+View(requests_fixed_wards)
+```
+
+```{r days_to_solve}
+requests_fixed_wards$days_to_solve <- as.Date(as.character(requests_fixed_wards$RESOLUTIONDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(requests_fixed_wards$SERVICEORDERDATE), format = "%Y-%m-%d")
+View(requests_fixed_wards)
+```
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+```{r}
+crashes <- crashes %>%
+  mutate(INDEX = 1)
+View(crashes)
+
+requests_fixed_wards <- requests_fixed_wards %>%
+  mutate(INDEX = 1)
+View(requests_fixed_wards)
+```
+
+
+```{r}
+ggplot() +
+  geom_point(data = requests_fixed_wards, aes(x = ADDDATE), stat = "bin") +
+  geom_smooth(requests_fixed_wards, mapping = aes(x = ADDDATE), stat = "bin") +
+  geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+  facet_wrap(~ WARD, nrow=3)
+```
+
+uses the old trafficrequest frame
+```{r}
+# ggplot() +
+#   geom_point(data = trafficrequests, aes(x = ADDDATE), stat = "bin") +
+#   geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
+#   geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+#   geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+#   facet_wrap(~ WARD, nrow=3)
+```
+
+```{r}
+# ggplot() +
+#   geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+#   geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+#   facet_wrap(~ WARD, nrow=3)
+```
+
+```{r bydate}
+library(tibbletime)
+#frequency_by_date <- create_series('2012' ~ '2019', 'daily', class="Date") %>%
+  #mutate(ward = 1:8)
+
+#frequency_by_date
+
+crashes_by_date <- crashes %>% group_by(FROMDATE,WARD) %>%
+  summarise(dailycrashes = sum(INDEX))
+
+
+
+# crashes_by_date %>% mutate(
+#   group_by(requests_fixed_wards$ADDDATE,requests_fixed_wards$WARD) %>%
+#   summarise(dailyrequests = sum(requests_fixed_wards$INDEX))
+#   )
+
+View(crashes_by_date)
+
+requests_by_date <- requests_fixed_wards %>% group_by(ADDDATE,WARD) %>%
+  summarise(dailyrequests = sum(INDEX))
+
+elapsed_by_date<- requests_fixed_wards %>% group_by(ADDDATE, WARD) %>%
+  summarise(avg_time_elapsed = mean(days_to_solve))
+str(requests_by_date)
+
+View(requests_by_date)
+
+requests_by_date <- requests_by_date %>% mutate(NEWDATE = as.Date(ADDDATE))
+crashes_by_date <- crashes_by_date %>% mutate(NEWDATE = as.Date(FROMDATE))
+elapsed_by_date<- elapsed_by_date %>%mutate(NEWDATE = as.Date(ADDDATE))
+# by_date <- merge(crashes_by_date, requests_by_date, by.crashes_by_date=c("WARD","FROMDATE"), by.requests_by_date = c("WARD","ADDDATE"))
+# head(by_date)
+
+```
+
+
+```{r}
+by_date <- inner_join(crashes_by_date, requests_by_date, by = c('NEWDATE', 'WARD'))
+View(by_date)
+by_date$dailycrashes[is.na(by_date$dailycrashes)] <- 0
+by_date$dailyrequests[is.na(by_date$dailyrequests)] <- 0
+
+by_date_with_time <- inner_join(by_date, elapsed_by_date, by = c('NEWDATE','WARD'))
+View(by_date_with_time)
+
+## ^^ origin of this code
+View(by_date)
+
+```
+
+Origin of NA elimination code above. [link](https://stackoverflow.com/questions/13172711/replace-na-values-from-a-column-with-0-in-data-frame-r)
+```
+a$x[a$x==NA]<-0;
+a[,c("x")]<-apply(a[,c("x")],1,function(z){replace(z, is.na(z), 0)});
+a$x[is.na(a$x),]<-0;
+```
+
+```{r}
+without_ward <- by_date %>% 
+  group_by(NEWDATE) %>%
+  summarize(dailycrashes = sum(dailycrashes), dailyrequests = sum(dailyrequests), avg_timeelapsed = sum(avg_timeelapsed))
+View(without_ward)
+
+# TEST YOUR MERGE
+<<<<<<< HEAD
+#greater_than_one <- without_ward %>% filter(dailycrashes !=0, dailycrashes<500, dailyrequests <500, dailycrashes & dailyrequests != 0) 
+#View(greater_than_one)
+```
+```{r}
+greater_than_one <- without_ward %>% filter(dailycrashes !=0 & dailyrequests != 0) 
+=======
+greater_than_one <- by_date %>% filter(dailycrashes !=0 & dailyrequests != 0) 
+>>>>>>> 9c37e815bb3eb3e280580ba8d209d596fd7170d5
+View(greater_than_one)
+```
+
+
+```{r}
+by_date <- inner_join(crashes_by_date, requests_by_date, by = c('NEWDATE', 'WARD',''))
+View(by_date)
+by_date$dailycrashes[is.na(by_date$dailycrashes)] <- 0
+by_date$dailyrequests[is.na(by_date$dailyrequests)] <- 0
+## ^^ origin of this code
+View(by_date)
+```
+
+
+```{r}
+library(moderndive)
+library(GGally)
+
+first_model <- lm(dailyrequests ~ dailycrashes, data = without_ward)
+get_regression_table(first_model)
+View(first_model)
+
+get_regression_points(first_model)
+
+ggplot(without_ward, aes(y = dailycrashes, x = dailyrequests)) + 
+  geom_point() + 
+  geom_parallel_slopes(se = FALSE)
+
+<<<<<<< HEAD
+summary(first_model)
+
+
+second_model<- lm(dailycrashes~avg_time_elapsed, data= by_date_with_time)
+get_regression_table(second_model)
+view(second_model)
+
+ggplot(by_date_with_time, mapping = aes(x=by_date_with_time$avg_time_elapsed, y=by_date_with_time$dailycrashes))+
+  geom_line()
+# par(mfrow=c(1, 2))
+# boxplot(without_ward$dailycrashes, main= "daily crashes", sub=paste("Outlier rows: ", boxplot.stats(without_ward$dailycrashes)$out))
+# 
+# boxplot(without_ward$dailyrequests, main= "daily requests", sub=paste("Outlier rows: ", boxplot.stats(without_ward$dailyrequests)$out))
+# 
+# ggplot(without_ward, aes(x= without_ward$dailycrashes))+ geom_histogram()
+# ggplot(without_ward, aes(x= without_ward$dailycrashes))+ geom_histogram(binwidth = 1)
+
+par(mfrow=c(1, 2))
+boxplot(by_date$dailycrashes, main= "daily crashes", sub=paste("Outlier rows: ", boxplot.stats(by_date$dailycrashes)$out))
+
+boxplot(greater_than_one$dailyrequests, main= "daily requests", sub=paste("Outlier rows: ", boxplot.stats(greater_than_one$dailyrequests)$out))
+
+ggplot(by_date, aes(x= by_date$dailycrashes))+ geom_histogram()
+ggplot(by_date, aes(x= by_date$dailyrequests))+ geom_histogram(binwidth = 1)
+
+##Correlation 
+cor(greater_than_one$dailycrashes, greater_than_one$dailyrequests)
+=======
+ggpairs(data=by_date, columns=c(2,3,4,6), title="trees data")
+>>>>>>> 9c37e815bb3eb3e280580ba8d209d596fd7170d5
+
+# sim1_mod <- lm(dailycrashes ~ dailyrequests, data = by_date, na.action=na.exclude)
+# coef(sim1_mod)
+# 
+# str(sim1_mod)
+
+# grid <- by_date %>% 
+#   data_grid(dailycrashes) 
+# grid
+# 
+# grid <- augment(sim1_mod, newdata = grid)
+# grid
+# 
+# ggplot(sim1, aes(x)) +
+#   geom_point(aes(y = y)) +
+#   geom_line(aes(y = .fitted), data = grid, color = "red", size = 1) +
+#   geom_point(aes(y = .fitted), data = grid, color = "blue", size = 3)
+
+```
+```{r}
+
+```
+
+
+```{r}
+# df1 = data.frame(CustomerId=c(1:10),
+#              Hobby = c(rep("sing", 4), rep("pingpong", 3), rep("hiking", 3)),
+#              Product=c(rep("Toaster",3),rep("Phone", 2), rep("Radio",3), rep("Stereo", 2)))
+# 
+# View(df1)
+# 
+# df2 = data.frame(CustomerId=c(2,4,6, 8, 10),State=c(rep("Alabama",2),rep("Ohio",1),   rep("Cal", 2)),
+#              like=c("sing", 'hiking', "pingpong", 'hiking', "sing"))
+# 
+# View(df2)
+# 
+# df3 = merge(df1, df2, by.x=c("CustomerId", "Hobby"), by.y=c("CustomerId", "like"))
+# 
+# View(df3)
+```
+
+
+
+
+
+
