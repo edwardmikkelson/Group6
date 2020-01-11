@@ -1,5 +1,5 @@
 ---
-title: "DetailsAnalysisG6"
+title: "details_and_wardsAnalysisG6"
 author: "Hannah Brown"
 date: "1/7/2020"
 output: html_document
@@ -22,7 +22,7 @@ crashes <- crashes %>%
   mutate(INDEX = 1)
 View(crashes)
 
-Details <- read.csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
+details_and_wards <- read.csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
 ```
 
 ```{r}
@@ -34,33 +34,33 @@ library(ggplot2)
 
 ```{r}
 #summarizing data
-sumDet <- summary(Details)
+sumDet <- summary(details_and_wards)
 sumDet
 ```
 
 ```{r}
-# Details$WARD <- crashes$WARD[match(crashes$CRIMEID,crashes$CRIMEID), all = FALSE];
-details_and_wards <- left_join(Details, crashes, by = "CRIMEID")
+# details_and_wards$WARD <- crashes$WARD[match(crashes$CRIMEID,crashes$CRIMEID), all = FALSE];
+details_and_wards <- left_join(details_and_wards, crashes, by = "CRIMEID")
 ```
 
 
 ```{r}
 #table summaries
-#yikes forgot this was continuous lol table(Details$AGE)
-table(Details$INVEHICLETYPE)
-table(Details$LICENSEPLATESTATE)
+#yikes forgot this was continuous lol table(details_and_wards$AGE)
+table(details_and_wards$INVEHICLETYPE)
+table(details_and_wards$LICENSEPLATESTATE)
 ```
 
 ```{r}
 #filtering out ages that are not relevant
-Details %>% 
+details_and_wards %>% 
   filter((AGE >= 16)&(AGE <= 93)) ->
   age1
 summary(age1)
 ```
 
 ```{r}
-Details %>% 
+details_and_wards %>% 
   mutate(`FATAL` = recode(FATAL, "N" = 0, 
                            "Y" = 1 ),
           `MAJORINJURY` = recode(`MAJORINJURY`, "N" = 0, 
@@ -73,60 +73,60 @@ Details %>%
                                        "Y" = 1 ),
          `SPEEDING` = recode(SPEEDING,"N" = 0, 
                                        "Y" = 1 )) ->
-  Details1
+  details_and_wards1
 ```
 
 ```{r}
 #filtering out ages that are not relevant
-Details1 %>% 
+details_and_wards1 %>% 
   filter((AGE >= 16)&(AGE <= 93)) ->
-  Details1
+  details_and_wards1
 ```
 
 ```{r}
 #filtering out ages that are not relevant
-Details1 %>% 
+details_and_wards1 %>% 
   filter((LICENSEPLATESTATE == "MD")|(LICENSEPLATESTATE == "VA")|(LICENSEPLATESTATE == "DC")) ->
-  Details1
-summary(Details1)
+  details_and_wards1
+summary(details_and_wards1)
 ```
 
 ```{r}
 #plotting relevant ages
-ggplot(Details1 = Details1, mapping = aes(x = Details1$AGE, fill = Details1$LICENSEPLATESTATE)) +
+ggplot(details_and_wards1 = details_and_wards1, mapping = aes(x = details_and_wards1$AGE, fill = details_and_wards1$LICENSEPLATESTATE)) +
   geom_histogram( bins = 20)
 ```
 
 ```{r}
-Details1 %>% 
-  ggplot(data = Details1, mapping = aes(x = LICENSEPLATESTATE)) +
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(x = LICENSEPLATESTATE)) +
   geom_bar()
 ```
 
 ```{r}
-Details1 %>% 
-  ggplot(data = Details1, mapping = aes(INVEHICLETYPE, fill = FATAL), par(las = 2)) +
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(INVEHICLETYPE, fill = FATAL), par(las = 2)) +
   geom_bar(position = "stack")
 ```
 
 ```{r}
-Details %>% 
-  ggplot(data = Details, mapping = aes(PERSONTYPE)) +
+details_and_wards %>% 
+  ggplot(data = details_and_wards, mapping = aes(PERSONTYPE)) +
   geom_bar(position = "stack", las = 2)
 ```
 
 
 ```{r}
-Details1 %>% 
-  ggplot(data = Details1, mapping = aes(PERSONTYPE, FATAL, color = LICENSEPLATESTATE)) +
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(PERSONTYPE, FATAL, color = LICENSEPLATESTATE)) +
   geom_jitter() +
   facet_wrap(~INVEHICLETYPE)
 ```
 
 
 ```{r}
-Details1 %>% 
-  ggplot(data = Details1, mapping = aes(x = MAJORINJURY,  y = AGE, color = IMPAIRED)) +
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(x = MAJORINJURY,  y = AGE, color = IMPAIRED)) +
   geom_bar(stat = "identity")
 ```
 
@@ -146,13 +146,13 @@ library(parsnip)
 
 Est of Bayesian logistic regression
 ```{r}
-mc_post <- MCMClogit(FATAL ~ 1, data = Details1)
+mc_post <- MCMClogit(FATAL ~ 1, data = details_and_wards1)
 summary(mc_post)
 ```
 
 Modeling fuller Bayesian model
 ```{r}
-mc_post_full <- MCMClogit(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE, data = Details1, burnin = 500, mcmc = 2000, thin = 2)
+mc_post_full <- MCMClogit(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE, data = details_and_wards1, burnin = 500, mcmc = 2000, thin = 2)
 summary(mc_post_full)
 ```
 
@@ -163,7 +163,7 @@ mc_int
 ```
 
 ```{r}
-pdf("mcmc_Details.pdf")
+pdf("mcmc_details_and_wards.pdf")
 plot(mc_post_full)
 dev.off()
 ```
@@ -179,7 +179,7 @@ Estimate Machine Learning Models
 ```{r}
 predictors <- c("MAJORINJURY", "MINORINJURY", "TICKETISSUED", "IMPAIRED", "SPEEDING", "AGE")
 
-X <- Details1[, predictors]
+X <- details_and_wards1[, predictors]
 ```
 
 Feature engineering
@@ -190,14 +190,14 @@ X <- X %>% mutate(age2 = AGE^2,
                   age5 = AGE^5) %>%
   as.matrix()
 
-y <- Details1[, "FATAL"] %>% unlist %>% as.numeric()
+y <- details_and_wards1[, "FATAL"] %>% unlist %>% as.numeric()
 ```
 
 Est LS model
 ```{r}
 lm_out <- lm(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE + 
             I(AGE^2) + I(AGE^3) + I(AGE^4) + I(AGE^5),
-             data = Details1)
+             data = details_and_wards1)
 coefs_lm <- coef(lm_out)
 summary(lm_out)
 ```
