@@ -1,0 +1,158 @@
+\PassOptionsToPackage{unicode=true}{hyperref} % options for packages loaded elsewhere
+\PassOptionsToPackage{hyphens}{url}
+\PassOptionsToPackage{dvipsnames,svgnames*,x11names*}{xcolor}
+%
+\documentclass[ignorenonframetext,]{beamer}
+\usepackage{pgfpages}
+\setbeamertemplate{caption}[numbered]
+\setbeamertemplate{caption label separator}{: }
+\setbeamercolor{caption name}{fg=normal text.fg}
+\beamertemplatenavigationsymbolsempty
+% Prevent slide breaks in the middle of a paragraph:
+\widowpenalties 1 10000
+\raggedbottom
+\setbeamertemplate{part page}{
+\centering
+\begin{beamercolorbox}[sep=16pt,center]{part title}
+  \usebeamerfont{part title}\insertpart\par
+\end{beamercolorbox}
+}
+\setbeamertemplate{section page}{
+\centering
+\begin{beamercolorbox}[sep=12pt,center]{part title}
+  \usebeamerfont{section title}\insertsection\par
+\end{beamercolorbox}
+}
+\setbeamertemplate{subsection page}{
+\centering
+\begin{beamercolorbox}[sep=8pt,center]{part title}
+  \usebeamerfont{subsection title}\insertsubsection\par
+\end{beamercolorbox}
+}
+\AtBeginPart{
+  \frame{\partpage}
+}
+\AtBeginSection{
+  \ifbibliography
+  \else
+    \frame{\sectionpage}
+  \fi
+}
+\AtBeginSubsection{
+  \frame{\subsectionpage}
+}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provides euro and other symbols
+\else % if luatex or xelatex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+\usetheme[]{metropolis}
+\usecolortheme{seahorse}
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage[]{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+            pdftitle={Estimation of Fatal Crashes},
+            pdfauthor={Lucas Anderton, Hannah Brown, Lucas Gorak, Edward Mikkelson},
+            colorlinks=true,
+            linkcolor=Maroon,
+            filecolor=Maroon,
+            citecolor=Blue,
+            urlcolor=blue,
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\newif\ifbibliography
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+
+% set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+
+
+\title{Estimation of Fatal Crashes}
+\author{Lucas Anderton, Hannah Brown, Lucas Gorak, Edward Mikkelson}
+\date{1/8/2020}
+
+\begin{document}
+\frame{\titlepage}
+
+\begin{frame}{Question}
+\protect\hypertarget{question}{}
+
+For every additional 311 request in a particular, what is the effect on
+frequency of crashes? How does the average latency between requested
+date and due date differ between wards? Estimation of fatalities from
+historically documented characteristics of driving patterns? The
+literature says\ldots{} This is why it's important\ldots{}
+
+\end{frame}
+
+\begin{frame}{Data Collection Procedure}
+\protect\hypertarget{data-collection-procedure}{}
+
+-Open Data DC: Crash data and Details data -Merge?
+
+\end{frame}
+
+\begin{frame}[fragile]{Interesting Features and Data Processing}
+\protect\hypertarget{interesting-features-and-data-processing}{}
+
+\begin{itemize}
+\tightlist
+\item
+  Crashes has 223990 observations and 60 columns
+\item
+  Details has 443867 observations and 15 variables
+\item
+  Ages beginning at -7990 and ranged up to 237
+\item
+  License plate \texttt{None} produced a high number of crashes in the
+  data set
+\item
+  The full dataset reaches back until 1975
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Methods}
+\protect\hypertarget{methods}{}
+
+-recode major and minor injuries -recode person to numerical -recode
+ticketissued to numerical -recode speeding to numerical
+
+\end{frame}
+
+\begin{frame}{Analysis}
+\protect\hypertarget{analysis}{}
+
+\end{frame}
+
+\begin{frame}{Future Implications}
+\protect\hypertarget{future-implications}{}
+
+\end{frame}
+
+\end{document}
