@@ -1,0 +1,603 @@
+---
+title: "Estimation of Fatal Crashes"
+author: "Lucas Anderton, Hannah Brown, Lucas Gorak, Edward Mikkelson"
+date: "1/11/2020"
+output: html_document
+---
+
+## Question
+1. What is the relationship between 311 requests and frequency of crashes?
+
+2. How does the average latency between requested date and resolution date affect frequency of  crashes?
+
+3. Is there a geographic relationship between crashes and 311 requests?
+
+4. What factors best estimate fatalities? 
+
+In our analysis, we were interested in understanding the relationship, if any, between various factors, like population increase and road conditions, and the crashes that occurred in the District of Columbia. Previous research has indicated that D.C. has the third worst traffic congestion in the United States. However, their ranking has improved since 2011, which D.C. had the worst congestion of all 50 states. In that same period of time, the number of crashes in D.C. has increased significantly. Intuitively, we credited the increase to more traffic from the constantly growing population in the Washington metro area. D.C.'s public datasets on traffic are convoluted and difficult to manipulate for analysis. It is recorded in 15,000+ rows from various traffic-volume meters throughout the city on an annual basis. However, every year, the number of meters and other variables in the data change. Alternately, we chose to compare the number of crashes to the 311 traffic service requests. 311 traffic service requests offer information regarding the number of commuters out on the roads and the state of the city's vehicle infrastructure. In our research, we wanted to understand what the relationship between these 311 traffic requests and the frequency of crashes in D.C. Additionally, these data include timestamp information, like the date they were submitted, the date they were due (most likely based on a city algorithm for how long certain requests should take), and the date they were resolved. We wanted to see if a relationship existed between rising latency in resolution times and the frequency of crashes. The reasoning behind our hypothesis was that if the city was taking longer to respond to poor road and navigation conditions, more incidents may occur. We also wanted to investigate if there was a geographical relationship between crashes and 311 requests. And lastly, we were interested in analyzing what factors best estimate risk of faility in a crash.
+
+## Social Context
+
+- Public health and safety
+
+- Government responsiveness
+
+- Manifestations of demographic disparities
+
+In our preliminary research, we found three comprehensive datasets from D.C.'s open data site, each offering salient variables pertaining to vehicle crashes in D.C. over time. The first set we explored was mostly categorical and qualitative, which left much to be desired in terms of quantitative analysis. The remaining sets include a combined 63 variables, both qualitative and quantitative in nature. 
+
+Next, we happened upon the city's 311 service request data portal, on the same OpenData library. The portal offered custom data downloaded, allowing the user to select a date range or data for one specific type of request. The full data set included more than 1.5 million rows with approximately ten types of requests. We were able to import our data directly from D.C.'s OpenData portal.  
+
+
+## Data Collection Procedure
+- Started with OpenDataDC's `crashes` dataset.
+
+- Explored related `crashdetails` in a relational table.
+
+- Using that for additional data on a subset of the DC crashes. 
+
+- Summarized 311 Requests `threeoneonerequestts` and `crashes` by count per day.
+
+- Merged the `crashes` with `crashdetails` by `CRIMEID` to include `WARD`
+
+
+
+## Interesting Features and Data Processing 
+- `crashes` has 223990 observations and 60 columns 
+
+- `crashdetails` has 443867 observations and 15 variables
+
+- `threeoneonerequests` 1.5 million observations >>> compressed to 65,000 rows
+
+- Ages beginning at -7990 and ranged up to 237
+
+- License plate `None` produced a high number of crashes in the data set
+
+- The full dataset reaches back until 1975
+
+In order to compare the number of service requests to the number of accidents on a given day, we had to combine the `crashes` and `details` datasets. This proved challenging, as the datasets are remarkably large, and have dates that do not align. We remedied the former issue by selecting 311 requests that pertained to traffic related requests only. This included "roadway signs," "streetlight repair," and "potholes." 
+
+
+## Methods
+- Recoding data from categorical to binary for use in regression models
+
+- Ran a series of exploratory models with `ggplot` 
+
+- Estimate Bayesian logistic regression
+
+For estimation of hte varoius regression models, the first order of operation was to recode the data from character types to binary so variables such as `SPEEDING` and `IMPAIRED` functioned as factors. Other data wrangling such as limiting the `AGE` variable and restricting the `FROMDATE` begging at 2012 was completed to complete better analysis. `ggplot` was used primarily to visualize data for exploratory data analysis and mapping. 
+
+We began by creating a regression model for the daily requests and daily crashes. Our model shows a clear correlation between the number of service requests on a given day and the number of crashes. We then plotted the service request number and crash number for each day with the regression line. We also mapped both service requests and crashes on a geographical map using `ggmap` and a Google API. We then used a K-means clustering algorithm on geospatial data to find groupings.
+
+
+## Analysis
+```{r, include=FALSE}
+library(readr)
+library(dplyr)
+library(here)
+library(MCMCpack)
+library(glmnet)
+library(parsnip)
+library(tidyverse)
+library(magrittr)
+library(ggplot2)
+library(lubridate)
+library(data.table)
+library(ggrepel)
+library(ggmap)
+library(broom)
+library(moderndive)
+library(GGally)
+```
+
+```{r setup, cache=TRUE, include=FALSE}
+col1 = "#011f4b"
+col2 = "#6497b1"
+col3 = "#b3cde0"
+col4 = "#CC0000"
+```
+
+```{r, include=FALSE}
+#loading data
+crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+crashes$WARD[crashes$WARD == "Null"] <- NA
+summary(is.na(crashes))
+```
+
+```{r, include=FALSE}
+crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
+
+crashes <- crashes %>%
+  mutate(INDEX = 1)
+
+Details <- read.csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
+```
+
+```{r, include=FALSE}
+#joinging Details and Crashes to get WARD data
+details_and_wards <- left_join(Details, crashes, by = "CRIMEID")
+summary(details_and_wards)
+```
+
+```{r, include=FALSE}
+#deleting columns we dont care about
+details_and_wards$LOCATIONERROR <- details_and_wards$LASTUPDATEDATE <- details_and_wards$MPDLATITUDE <- details_and_wards$MPDLONGITUDE <- details_and_wards$MPDGEOX <- details_and_wards$MPDGEOY <- details_and_wards$STREETSEGID <- details_and_wards$ROADWAYSEGID <- details_and_wards$MAR_ADDRESS <- details_and_wards$TODATE <- details_and_wards$FATALPASSENGER <- details_and_wards$MAJORINJURIESPASSENGER <- details_and_wards$UNKNOWNINJURIESPASSENGER <- details_and_wards$CCN.x <- details_and_wards$CCN.y <- details_and_wards$ROUTEID <- details_and_wards$MEASURE <- details_and_wards$OFFSET <-  details_and_wards$MARID <-  details_and_wards$ADDRESS <- details_and_wards$EVENTID <- details_and_wards$MAR_ADDRESS <- details_and_wards$MAR_SCORE <- details_and_wards$TOTAL_TAXIS <- details_and_wards$TOTAL_GOVERNMENT <- details_and_wards$NEARESTINTROUTEID <- details_and_wards$NEARESTINTSTREETNAME <- details_and_wards$OFFINTERSECTION <- details_and_wards$INTAPPROACHDIRECTION <- details_and_wards$LOCATIONERROR <- details_and_wards$LASTUPDATEDATE <- details_and_wards$BLOCKKEY <- details_and_wards$SUBBLOCKKEY <- NULL
+```
+
+```{r, include=FALSE}
+#filtering out ages that are not relevant
+details_and_wards %>% 
+  filter((AGE >= 16) & (AGE <= 93)) ->
+  age1
+```
+
+```{r, include=FALSE}
+#recoding data to binary to use for regression
+age1 %>% 
+  mutate(`FATAL` = recode(FATAL, "N" = 0, 
+                           "Y" = 1 ),
+          `MAJORINJURY` = recode(`MAJORINJURY`, "N" = 0, 
+                                    "Y" = 1 ),
+         `MINORINJURY` = recode(MINORINJURY,"N" = 0, 
+                                       "Y" = 1 ),
+         `TICKETISSUED` = recode(TICKETISSUED,"N" = 0, 
+                                       "Y" = 1 ),
+         `IMPAIRED` = recode(IMPAIRED,"N" = 0, 
+                                       "Y" = 1 ),
+         `SPEEDING` = recode(SPEEDING,"N" = 0, 
+                                       "Y" = 1 )) ->
+  Details1
+```
+
+```{r, include=FALSE}
+#filtering out states that with little data
+Details1 %>% 
+  filter((LICENSEPLATESTATE == "MD") | (LICENSEPLATESTATE == "VA") | (LICENSEPLATESTATE == "DC")) ->
+  Details1
+summary(Details1)
+```
+This summary provides additional information about the distribution of each of the variables of interest, primarily that the data is heavily skewed to the right, with very few instnaces of ticketing, speeding, impairment, major and minory injuries, and fatalities recorded during vehicle crashes observed in DC.
+
+
+```{r, include=FALSE}
+Details2 <- na.omit(Details1)
+```
+
+```{r, echo=TRUE, warning=FALSE}
+#plotting relevant ages
+ ggplot(data = Details2, mapping = aes(x = AGE, fill = LICENSEPLATESTATE)) +
+  geom_histogram( bins = 20)
+```
+This graph provides EDA for the relationship between age, where the vehicle involved in the crash is from by age. Notably the distribution is skewed to the right with the center approximately at the 25-30 age range.
+
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details1, mapping = aes(x = LICENSEPLATESTATE, fill = WARD)) +
+  geom_bar() +
+  labs(title = "Counts of Crashes and State of Origin by Ward", x = "Licenseplate State", y = "Count") 
+```
+From this plot it appears that the most crashes across the 3 most prevalent car state license plates is Ward 2. However looking at the frequency of this data is actually contigent on the time of day and day of the week that the crash occured considering that a number of people in the city are commuters who live outside the city so population density is not actually based on permanent address, but rather is quite complicated to measure because it includes commuters. 
+
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(INVEHICLETYPE, fill = WARD)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Counts of Crashes and Vehicle Type by Ward",  x = "Vehicle Type", y = "Count") 
+```
+Passenger car is clearly the most likely vehicle to experience a crash in, followed by bus and SUV. Interesting features: farm equipment, firearms, and motorhome.
+
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(PERSONTYPE, fill = WARD)) +
+  geom_bar() +
+  labs(title = "Counts of Crashes and Person Type by Ward",  x = "Person Type", y = "Count") 
+```
+We see the same pattern of prevalence of crashes by ward in person type as well, again knowing that population density is difficult to measure and that Ward 2 contains the downtown region which would expectedly have the most activity and therefore the most instances of crash. 
+
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(PERSONTYPE, FATAL, color = WARD, alpha = 0.00005)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE, ncol = 4 ) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(PERSONTYPE, IMPAIRED, color = WARD, alpha = 0.00005)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE, ncol = 4 ) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(PERSONTYPE, SPEEDING, color = LICENSEPLATESTATE, alpha = 0.00005)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE, ncol = 4 ) + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(PERSONTYPE, TICKETISSUED, color = LICENSEPLATESTATE, alpha = 0.00005)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE, ncol = 4 ) + 
+  theme(axis.text.x = element_text(angle = 45, hjust= 1))
+```
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(PERSONTYPE, MAJORINJURY, color = AGE, alpha = 0.00005)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE, ncol = 4 ) + 
+  theme(axis.text.x = element_text(angle = 45, hjust= 1))
+```
+---
+```{r, echo=TRUE, warning=FALSE}
+Details2 %>% 
+  ggplot(data = Details2, mapping = aes(PERSONTYPE, MINORINJURY, color = AGE, alpha = 0.00005)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE, ncol = 4 ) + 
+  theme(axis.text.x = element_text(angle = 45, hjust= 1))
+```
+---
+These faceted graphs provide more information abou the interactions between the people involved in the accident, the outcome (minor injury, major injury, ticketed, speeding, impaired, or fatal), in context of age, origin of car, or ward.
+
+---
+Estimate of Bayesian logistic regression
+---
+```{r, echo=TRUE, cache=TRUE}
+mc_post <- MCMClogit(FATAL ~ 1, data = Details2, , burnin = 500, mcmc = 2000, thin = 5)
+summary(mc_post)
+plot(mc_post)
+```
+---
+Modeling fuller Bayesian model
+---
+```{r, echo=TRUE, cache=TRUE}
+mc_post_full <- MCMClogit(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE, data = Details2, burnin = 500, mcmc = 2000, thin = 5)
+summary(mc_post_full)
+plot(mc_post_full)
+```
+---
+# These MCMClogit show the posterior coefficients do not appear to converge to one specific value, so it is unlikely that the plots created in the previous slides represent what were to actually occur in the data due to few iterations. 
+---
+
+# Estimate Machine Learning Models with LS and LASSO
+---
+```{r, include=FALSE, cache = TRUE}
+predictors <- c("MAJORINJURY", "MINORINJURY", "TICKETISSUED", "IMPAIRED", "SPEEDING", "AGE")
+
+X <- as.matrix(Details1[, predictors])
+y <- Details1[, "FATAL"] %>% unlist %>% as.numeric()
+```
+
+
+```{r, echo=TRUE, cache=TRUE}
+#Est LS model
+lm_out <- lm(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE,
+             data = Details1)
+coefs_lm <- coef(lm_out)
+summary(lm_out)
+```
+
+
+```{r, echo=TRUE, cache=TRUE}
+#Estimate with LASSO
+lasso_out <- glmnet(X, y, alpha = 1)
+```
+---
+##The Model
+
+FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE + 
+            I(AGE^2) + I(AGE^3) + I(AGE^4) + I(AGE^5)
+            
+LS
+- `MAJORINJURY  -9.435e-04  3.196e-04  -2.952  0.00315 ** `
+
+- `MINORINJURY  -7.591e-04  1.524e-04  -4.980 6.37e-07 ***`
+
+- `SPEEDING      1.283e-02  4.985e-04  25.742  < 2e-16 ***`
+
+`Multiple R-squared:  0.002624,	Adjusted R-squared:  0.002586 `
+
+LASSO
+- \u03BB  values of  `~3.390e-06`
+
+`    Matrix of class "dgCMatrix"       `
+                       ` 1      coefs_lm`
+`(Intercept)  0.0005772126  1.281927e-03`
+`MAJORINJURY  .            -9.435326e-04`
+`MINORINJURY  .            -7.591192e-04`
+`TICKETISSUED .            -1.386333e-04`
+`IMPAIRED     .            -4.035846e-05`
+`SPEEDING     .             1.283127e-02`
+`AGE          .            -6.488488e-05`
+`age2         .             1.511924e-06`
+`age3         .            -1.024776e-09`
+`age4         .            -2.892995e-10`
+`age5         .             2.389548e-12`
+
+
+With \u03BB  values of of `1.189e-03` to `~3.390e-06` it is unlikely that the LASSO provides any additional information than the LS squares. The model we produced is highly unreliable, even though the `MAJORINJURy`, `MINORINJURY` and `AGE` produced highly significant results. We believe that the variation in the model must be explained by an undected variable that was not measured in the data provided. 
+---
+
+
+
+##Threeoneone Data Import
+
+```{r, echo=TRUE, cache=TRUE}
+threeoneone_2 = read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+
+threeoneone_2 <- filter(threeoneone_2, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
+
+head(threeoneone_2)
+attach(threeoneone_2)
+threeoneone_2long <- threeoneone_2$LONGITUDE
+threeoneone_2lat <- threeoneone_2$LATITUDE
+
+```
+
+##Crash Data Import
+
+```{r, echo=TRUE, cache=TRUE}
+crashdata <- read.csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+head(crashdata)
+attach(crashdata)
+```
+
+##Data Wrangling
+
+```{r, echo=TRUE}
+threeoneone_2$ymd <- ymd_hms(ADDDATE)
+threeoneone_2[complete.cases(threeoneone_2), ]
+crashdata_clean_date <- gsub("T.*", "", crashdata$FROMDATE)
+crashdata$crashdate <- ymd(crashdata_clean_date)
+crashdata[complete.cases(crashdata), ]
+crashdatalong <- crashdata$LONGITUDE
+crashdatalat <- crashdata$LATITUDE
+```
+
+##Create DC Map with Google API
+
+```{r, echo=TRUE, cache=TRUE}
+ggmap::register_google(key = "AIzaSyA3nim7i8YYK3_Bkz9oqFW1Vcg0rXDG7lY")
+dcmap <- ggmap(get_map(location = c(lon = -77.02106, lat = 38.905), zoom = 12, scale = 1, maptype = 'terrain', color = 'color'))
+```
+
+##DC Map 
+
+```{r, echo=TRUE}
+dcmap
+```
+
+##Threeoneone Requests in DC
+
+```{r, echo=TRUE, cache =TRUE, message = FALSE}
+dcmap_311 <- dcmap + geom_point(data = threeoneone_2, aes(x = threeoneone_2long, y = threeoneone_2lat), color = col1, alpha = 0.1, size = 0.05) + theme(legend.position = "none") 
+dcmap_311
+```
+This map shows 311 requests in DC. Requests are concentrated in more urban, densely populated areas. 
+
+
+##Crashes in DC
+
+```{r, echo=TRUE, cache=TRUE, message = FALSE}
+dcmap_crashes <- dcmap + geom_point(data = crashdata, aes(x = crashdatalong, y = crashdatalat), color = col4, alpha = 0.05, size = 0.05) + theme(legend.position = "none")
+dcmap_crashes
+```
+This map shows the recorded crashes in DC. Crashes are concentrated on busier roads and in the center of DC. 
+
+##Threeoneone and Crashes in DC
+
+```{r, echo=TRUE, cache=TRUE, message = FALSE}
+dcmap_311_crashes <- dcmap + geom_point(data = threeoneone_2, aes(x = threeoneone_2long, y = threeoneone_2lat), color = col1, alpha = 0.1, size = 0.05) + geom_point(data = crashdata, aes(x = crashdatalong, y = crashdatalat), color = col4, alpha = 0.05, size = 0.05) + theme(legend.position = "none") 
+dcmap_311_crashes
+```
+This map overlays crashes with service requests. 
+
+##Detail of Threeoneone and Crashes in Downtown DC
+
+```{r, echo=TRUE, cache=TRUE, message = FALSE}
+dcmap_dt <- ggmap(get_map(location = c(lon = -77.02906, lat = 38.905), zoom = 14, scale = 2, maptype = 'terrain', color = 'color'))
+dcmap_dt_311_crashes <- dcmap_dt + geom_point(data = threeoneone_2, aes(x = threeoneone_2long, y = threeoneone_2lat), color = col1, alpha = 0.1, size = 1) + geom_point(data = crashdata, aes(x = crashdatalong, y = crashdatalat), color = col4, alpha = 0.05, size = 1) + theme(legend.position = "none")
+dcmap_dt_311_crashes
+```
+This map details the 311 requests and crashes in Downtown DC. In this area, the concentration of crashes is high, and the concentration of 311 requests is high (especially north of N St). 
+
+
+##Detail of Threeoneone and Crashes in NW DC
+
+```{r, echo=TRUE, cache=TRUE, message = FALSE}
+dcmap_nw <- ggmap(get_map(location = c(lon = -77.07, lat = 38.94), zoom = 14, scale = 2, maptype = 'terrain', color = 'color'))
+dcmap_nw_311_crashes <- dcmap_nw + geom_point(data = threeoneone_2, aes(x = threeoneone_2long, y = threeoneone_2lat), color = col1, alpha = 0.1, size = 1) + geom_point(data = crashdata, aes(x = crashdatalong, y = crashdatalat), color = col4, alpha = 0.05, size = 1) + theme(legend.position = "none")
+dcmap_nw_311_crashes
+```
+This map details the 311 requests and crashes in Northwest DC. In this area, crashes tend to be concentrated on busier roads and rarely occur within the suburbs. However, there is still a high concentration of 311 requests in this area. 
+
+##Detail of Threeoneone and Crashes in NE DC
+
+```{r, echo=TRUE, cache=TRUE, message = FALSE}
+dcmap_ne <- ggmap(get_map(location = c(lon = -76.995, lat = 38.925), zoom = 14, scale = 2, maptype = 'terrain', color = 'color'))
+dcmap_ne_311_crashes <- dcmap_ne + geom_point(data = threeoneone_2, aes(x = threeoneone_2long, y = threeoneone_2lat), color = col1, alpha = 0.1, size = 1) + geom_point(data = crashdata, aes(x = crashdatalong, y = crashdatalat), color = col4, alpha = 0.05, size = 1) + theme(legend.position = "none")
+dcmap_ne_311_crashes
+```
+This map details the 311 requests and crashes in Northeast DC. While crashes are concentrated on busier roads, crashes still occur off of these roads. There are fewer 311 requests in this area compared to Northwest DC.
+
+##Detail of Threeoneone and Crashes in SW/SE DC
+
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+dcmap_swse <- ggmap(get_map(location = c(lon = -76.993, lat = 38.867), zoom = 14, scale = 2, maptype = 'terrain', color = 'color'))
+dcmap_swse_311_crashes <- dcmap_swse + geom_point(data = threeoneone_2, aes(x = threeoneone_2long, y = threeoneone_2lat), color = col1, alpha = 0.1, size = 1) + geom_point(data = crashdata, aes(x = crashdatalong, y = crashdatalat), color = col4, alpha = 0.05, size = 1) + theme(legend.position = "none")
+dcmap_swse_311_crashes
+```
+This map details the 311 requests and crashes in Southwest/Southeast DC. In this area there are high concentrations of crashes on the busier roads and highways and 311 requests are concentrated in batches. 
+
+##Clustering Crash Coordinates (Pre-Cluster Wrangling)
+
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+crashdata <- crashdata %>% filter( X > -77.11, X < -76.89)
+crashdata <- crashdata %>% filter( Y < 39, Y > 38.7)
+crashx <- crashdata$X
+crashy <- crashdata$Y 
+crashxy <- matrix(c(crashx,crashy), ncol = 2)
+```
+
+#Making Two Sets of Clusters
+
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+crash_clusterinfo_8 <- kmeans(crashxy, 8)
+crash_clusterinfo_15 <- kmeans(crashxy, 15)
+crashxy_8 <- augment(crash_clusterinfo_8, crashxy)
+crashxy_15 <- augment(crash_clusterinfo_15, crashxy)
+```
+
+#Mapping the Clusters
+
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+dcmap_crash_kcluster_8 <- dcmap + geom_point(data = crashxy_8, aes(x = crashxy_8$X1, y = crashxy_8$X2, color = crashxy_8$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none")
+dcmap_crash_kcluster_15 <- dcmap + geom_point(data = crashxy_15, aes(x = crashxy_15$X1, y = crashxy_15$X2, color = crashxy_15$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none")
+dcmap_crash_kcluster_8
+dcmap_crash_kcluster_15
+```
+These maps shows clusters of crashes created by a K-means clustering. These can be compared to clustering of service requests to find areas of DC that have a high concentration of both service requests and crashes. However, the K-means clustering algorithm is imperfect, so a better algorithm such as DBSCAN on a machine with more computing power could be used to produce better results. 
+
+
+<!-- ##Clustering Threeoneone Coordinates (Pre-Cluster Wrangling) -->
+
+<!-- ```{r} -->
+<!-- #threeoneonex <- threeoneone_2$LATITUDE -->
+<!-- #threeoneoney <- threeoneone_2$LONGITUDE -->
+<!-- threeoneonexy <- matrix(c(threeoneonex,threeoneoney), ncol = 2) -->
+<!-- ``` -->
+
+<!-- ##Making Two Sets of Clusters -->
+
+<!-- ```{r} -->
+<!-- threeoneone_cluster_8 <- kmeans(threeoneonexy, 8) -->
+<!-- threeoneone_cluster_15 <- kmeans(threeoneonexy, 15) -->
+<!-- threeoneonexy_8 <- augment(threeoneone_cluster_8, threeoneonexy) -->
+<!-- threeoneonexy_15 <- augment(threeoneone_cluster_15, threeoneonexy) -->
+<!-- ``` -->
+
+<!-- ## Mapping the Clusters -->
+
+<!-- ```{r} -->
+<!-- dcmap_threeoneone_kcluster_8 <- dcmap + geom_point(data = threeoneonexy_8, aes(x = threeoneonexy_8$X1, y = threeoneonexy_8$X2, color = threeoneonexy_8$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none") -->
+<!-- dcmap_threeoneone_kcluster_15 <- dcmap + geom_point(data = threeoneonexy_15, aes(x = threeoneonexy_15$X1, y = threeoneonexy_15$X2, colour = threeoneonexy_15$.cluster, alpha = 0.01, size = 0.001)) + theme(legend.position = "none") -->
+<!-- dcmap_threeoneone_kcluster_8 -->
+<!-- dcmap_threeoneone_kcluster_15 -->
+<!-- ``` -->
+
+<!-- ##Comparing the Two Sets of Clusters -->
+
+<!-- ```{r} -->
+<!-- dcmap_crash_kcluster_8 -->
+<!-- dcmap_threeoneone_kcluster_8 -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- dcmap_crash_kcluster_15 -->
+<!-- dcmap_threeoneone_kcluster_15 -->
+<!-- ``` -->
+
+---
+```{r}
+threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
+```
+---
+```{r, echo=TRUE, cache = TRUE, message = FALSE}
+# sorts out the three types of service codes applicable to traffic data
+trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
+#head(trafficrequests)
+```
+
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+# gives a new variable, INDEX, and assigns every row a 1 for counting purposes. 
+crashes <- crashes %>%
+  mutate(INDEX = 1)
+#View(crashes)
+#same as above
+trafficrequests <- trafficrequests %>%
+  mutate(INDEX = 1)
+#View(trafficrequests)
+```
+
+```{r,echo=TRUE, cache=TRUE}
+trafficrequests$time_elapsed <- as.Date(as.character(trafficrequests$SERVICEDUEDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(trafficrequests$RESOLUTIONDATE), format = "%Y-%m-%d")
+#View(trafficrequests)
+```
+
+```{r, echo=TRUE, cache=TRUE}
+trafficrequests$days_to_solve <- as.Date(as.character(trafficrequests$RESOLUTIONDATE), format= "%Y-%m-%d") -
+  as.Date(as.character(trafficrequests$SERVICEORDERDATE), format = "%Y-%m-%d")
+#View(trafficrequests)
+```
+---
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+# plots the frequency of traffic requests and crashes by date, faceted with wards using bins (it defaults to like 30 values binned into a single point). 
+ggplot() +
+  geom_point(data = trafficrequests, aes(x = ADDDATE), stat = "bin") +
+  geom_smooth(trafficrequests, mapping = aes(x = ADDDATE), stat = "bin") +
+  geom_point(data = crashes, aes(x = FROMDATE), stat = "bin") +
+  geom_smooth(crashes, mapping = aes(x = FROMDATE), stat = "bin") +
+  facet_wrap(~ WARD, nrow=3)
+```
+---
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+# creates frequency tibble for crashes on each day
+crashes_by_date <- crashes %>% group_by(FROMDATE,WARD) %>%
+  summarise(dailycrashes = sum(INDEX))
+# creates frequency tibble for 311 requests on each day
+requests_by_date <- trafficrequests %>% group_by(ADDDATE,WARD) %>%
+  summarise(dailyrequests = sum(INDEX))
+# changes the head of FROMDATE in crashes and ADDDATE in requests to NEWDATE
+requests_by_date <- requests_by_date %>% mutate(NEWDATE = as.Date(ADDDATE))
+crashes_by_date <- crashes_by_date %>% mutate(NEWDATE = as.Date(FROMDATE))
+```
+---
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+by_date <- inner_join(crashes_by_date, requests_by_date, by = c('NEWDATE', 'WARD'))
+
+by_date$dailycrashes[is.na(by_date$dailycrashes)] <- 0
+by_date$dailyrequests[is.na(by_date$dailyrequests)] <- 0
+```
+
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+# for the first regression, we want to do it without that extra ward variable. This does that by grouping by date and merging all wards. 
+without_ward <- by_date %>% 
+  group_by(NEWDATE) %>%
+  summarize(dailycrashes = sum(dailycrashes), dailyrequests = sum(dailyrequests))
+```
+---
+```{r, echo=TRUE, cache=TRUE, message=FALSE}
+#ggpairs(data=by_date, columns=c(2,3,4,6), title="Running Models on Each Pair of Variables")
+first_model <- lm(dailyrequests ~ dailycrashes, data = without_ward)
+get_regression_table(first_model)
+#View(first_model)
+get_regression_points(first_model)
+ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) + 
+  geom_point() + 
+  geom_parallel_slopes(se = FALSE)
+```
+            
+
+
+
+Conventional wisdom holds that greater population densities correspond with greater volume of traffic incidents. However, the results from our linear regression model are generally consistent with our initial intuitions. Population does not capture the salient variables that can be used to predict traffic incidents in a given area. There is a clear and strong correlation between the 311 requests by day and the accident reports on the same day. This not only suggests that volume of traffic activity in a given area tends to correlate with a greater volume of traffic incidents, but also that 311 requests are a decent predictor of such volume. Future research should continue to explore how the nature of the 311 requests (such as their location, type of request, etc.) can offer information that would otherwise be unavailable in raw population data. Ward 2 posed a limitation to our model, as the density of traffic in this area is remarkably higher than any of the other wards during the day. Therefore, it is expected that this Ward would have far more traffic incidents even when controlling for the variables that may be contributing to them.  
+
+# 6 Implications
+- Opportunity to analyze particularly dangerous intersections
+- Increase usage of 311 complaints to address traffic andtransportation concerns
+- Importance of responding to 311 requests
+- Increase pedestrian safety infrastructure in crash-dense areas
+
+D.C. may be one of the most traffic congested cities in the United States, but the causes of such traffic cannot be explained by population increase alone. 311 requests are instructive in terms of their volume, nature, and location. These can be used to develop a picture as to what different parts of D.C. are like, and which ones are being neglected. The state of a Ward's infrastructure, for instance, can be estimated by taking time elapsed from the time a service request was made and when it was resolved. We recommend that future research uses more variables within the 311 data to predict where accidents are more likely to occur. The 311 requests also provide a window into the interaction between civil society and state, which is suprisingly higher than anticipated. 
