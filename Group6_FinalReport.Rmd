@@ -27,8 +27,8 @@ In our preliminary research, we found three comprehensive datasets from D.C.'s o
 Next, we happened upon the city's 311 service request data portal, on the same OpenData library. The portal offered custom data downloaded, allowing the user to select a date range or data for one specific type of request. The full data set included more than 1.5 million rows with approximately ten types of requests. We were able to import our data directly from D.C.'s OpenData portal.  
 
 ```{r}
-Details <- read.csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
-crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
+#Details <- read.csv("https://opendata.arcgis.com/datasets/70248b73c20f46b0a5ee895fc91d6222_25.csv")
+#crashes <- read_csv("https://opendata.arcgis.com/datasets/70392a096a8e431381f1f692aaa06afd_24.csv")
 threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?daterange=8years&details=true&format=csv")
 ```
 
@@ -41,6 +41,12 @@ threeoneone <- read_csv("https://datagate.dc.gov/search/open/311requests?dateran
 trafficrequests <- filter(threeoneone, SERVICECODEDESCRIPTION == c("roadway signs","streetlight repair investigation","pothole"))
 head(trafficrequests)
 ```
+
+```{r}
+# creates a new dataframe for Hannah's calculations, using the shared field "CRIMEID" and merges the supplemental crash details with the main crash dataset.  
+details_and_wards <- left_join(Details, crashes, by = "CRIMEID")
+```
+
 
 ```{r}
 crashes$WARD[crashes$WARD == "Null"] <- NA
@@ -193,7 +199,207 @@ ggplot(without_ward, aes(x = dailyrequests, y = dailycrashes)) +
 
 ```
 
-<!-- Hannah should put most of her code here -->
+## My attempt at migrating Hannah's code (btw, I search-and-replaced every occurrence of `Details` for `details_and_wards`. Hope that doesn't mess it up!)
+
+```{r}
+#summarizing data
+sumDet <- summary(details_and_wards)
+sumDet
+```
+
+```{r}
+# details_and_wards$WARD <- crashes$WARD[match(crashes$CRIMEID,crashes$CRIMEID), all = FALSE];
+details_and_wards <- left_join(details_and_wards, crashes, by = "CRIMEID")
+```
+
+
+```{r}
+#table summaries
+#yikes forgot this was continuous lol table(details_and_wards$AGE)
+table(details_and_wards$INVEHICLETYPE)
+table(details_and_wards$LICENSEPLATESTATE)
+```
+
+```{r}
+#filtering out ages that are not relevant
+details_and_wards %>% 
+  filter((AGE >= 16)&(AGE <= 93)) ->
+  age1
+summary(age1)
+```
+
+```{r}
+details_and_wards %>% 
+  mutate(`FATAL` = recode(FATAL, "N" = 0, 
+                           "Y" = 1 ),
+          `MAJORINJURY` = recode(`MAJORINJURY`, "N" = 0, 
+                                    "Y" = 1 ),
+         `MINORINJURY` = recode(MINORINJURY,"N" = 0, 
+                                       "Y" = 1 ),
+         `TICKETISSUED` = recode(TICKETISSUED,"N" = 0, 
+                                       "Y" = 1 ),
+         `IMPAIRED` = recode(IMPAIRED,"N" = 0, 
+                                       "Y" = 1 ),
+         `SPEEDING` = recode(SPEEDING,"N" = 0, 
+                                       "Y" = 1 )) ->
+  details_and_wards1
+```
+
+```{r}
+#filtering out ages that are not relevant
+details_and_wards1 %>% 
+  filter((AGE >= 16)&(AGE <= 93)) ->
+  details_and_wards1
+```
+
+```{r}
+#filtering out ages that are not relevant
+details_and_wards1 %>% 
+  filter((LICENSEPLATESTATE == "MD")|(LICENSEPLATESTATE == "VA")|(LICENSEPLATESTATE == "DC")) ->
+  details_and_wards1
+summary(details_and_wards1)
+```
+
+```{r}
+#plotting relevant ages
+ggplot(details_and_wards1 = details_and_wards1, mapping = aes(x = details_and_wards1$AGE, fill = details_and_wards1$LICENSEPLATESTATE)) +
+  geom_histogram( bins = 20)
+```
+
+```{r}
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(x = LICENSEPLATESTATE)) +
+  geom_bar()
+```
+
+```{r}
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(INVEHICLETYPE, fill = FATAL), par(las = 2)) +
+  geom_bar(position = "stack")
+```
+
+```{r}
+details_and_wards %>% 
+  ggplot(data = details_and_wards, mapping = aes(PERSONTYPE)) +
+  geom_bar(position = "stack", las = 2)
+```
+
+
+```{r}
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(PERSONTYPE, FATAL, color = LICENSEPLATESTATE)) +
+  geom_jitter() +
+  facet_wrap(~INVEHICLETYPE)
+```
+
+
+```{r}
+details_and_wards1 %>% 
+  ggplot(data = details_and_wards1, mapping = aes(x = MAJORINJURY,  y = AGE, color = IMPAIRED)) +
+  geom_bar(stat = "identity")
+```
+
+
+
+#Set Up
+```{r}
+library(readr)
+library(dplyr)
+library(here)
+library(MCMCpack)
+library(glmnet)
+library(parsnip)
+```
+
+#Estimate Bayesian Logistic Regression
+
+Est of Bayesian logistic regression
+```{r}
+mc_post <- MCMClogit(FATAL ~ 1, data = details_and_wards1)
+summary(mc_post)
+```
+
+Modeling fuller Bayesian model
+```{r}
+mc_post_full <- MCMClogit(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE, data = details_and_wards1, burnin = 500, mcmc = 2000, thin = 2)
+summary(mc_post_full)
+```
+
+Highest posterior density intervals for the coef
+```{r}
+HPDinterval(mc_post_full) -> mc_int
+mc_int
+```
+
+```{r}
+pdf("mcmc_details_and_wards.pdf")
+plot(mc_post_full)
+dev.off()
+```
+
+Posterior Probability Calculation- What is the posterior probability the `Neighbors` postcard has a larger coefficient than the `Hawthorne` card?
+```{r}
+mean(mc_post_full[, "MINORINJURY"] < mc_post_full[, "MAJORINJURY"])
+```
+
+Estimate Machine Learning Models
+
+`X` is a raw numeric matrix; `y` is a raw numeric vector
+```{r}
+predictors <- c("MAJORINJURY", "MINORINJURY", "TICKETISSUED", "IMPAIRED", "SPEEDING", "AGE")
+
+X <- details_and_wards1[, predictors]
+```
+
+Feature engineering
+```{r}
+X <- X %>% mutate(age2 = AGE^2,
+                  age3 = AGE^3,
+                  age4 = AGE^4,
+                  age5 = AGE^5) %>%
+  as.matrix()
+
+y <- details_and_wards1[, "FATAL"] %>% unlist %>% as.numeric()
+```
+
+Est LS model
+```{r}
+lm_out <- lm(FATAL ~ MAJORINJURY + MINORINJURY + TICKETISSUED + IMPAIRED + SPEEDING + AGE + 
+            I(AGE^2) + I(AGE^3) + I(AGE^4) + I(AGE^5),
+             data = details_and_wards1)
+coefs_lm <- coef(lm_out)
+summary(lm_out)
+```
+
+Estimate with LASSO
+```{r}
+lasso_out <- glmnet(X, y, alpha = 1)
+lasso_out
+```
+
+How to choose coefs? Use cross-validation to see which predicts best in `out-of-sample` tests. 
+```{r}
+set.seed(281) #train-test sets are consistent across implementations
+cv_lasso_out <- cv.glmnet(X, y, alpha = 1)
+```
+
+Show best coefs for the model, the one with the min deviance
+```{r}
+coef(cv_lasso_out, s = "lambda.min")
+```
+
+Lamda within in 1 SE of the min
+```{r}
+coef(cv_lasso_out, s = "lambda.1se")
+```
+
+```{r}
+coefs_lasso <- coef(cv_lasso_out, s = "lambda.1se")
+```
+
+```{r}
+cbind(coefs_lasso, coefs_lm)
+```
 
 # 5 Analysis of Results
 
