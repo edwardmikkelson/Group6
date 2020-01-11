@@ -220,6 +220,7 @@ View(greater_than_one)
 
 ```{r}
 library(moderndive)
+library(GGally)
 
 first_model <- lm(dailyrequests ~ dailycrashes, data = without_ward)
 get_regression_table(first_model)
@@ -230,6 +231,8 @@ get_regression_points(first_model)
 ggplot(without_ward, aes(y = dailycrashes, x = dailyrequests)) + 
   geom_point() + 
   geom_parallel_slopes(se = FALSE)
+
+ggpairs(data=by_date, columns=c(2,3,4,6), title="trees data")
 
 # sim1_mod <- lm(dailycrashes ~ dailyrequests, data = by_date, na.action=na.exclude)
 # coef(sim1_mod)
