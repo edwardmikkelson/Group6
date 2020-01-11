@@ -46,8 +46,6 @@ nrow(crashes)
 
 ```{r}
 crashes <- crashes %>% filter(as.Date(FROMDATE) >= "2012-01-01")
-
-
 ```
 
 turns out, we actually only needed to do this to the 311 requests. I didn't realize crashes was the data higher on the Y. So disregard the following chunk: 
@@ -215,7 +213,7 @@ without_ward <- by_date %>%
 View(without_ward)
 
 # TEST YOUR MERGE
-greater_than_one <- without_ward %>% filter(dailycrashes !=0 & dailyrequests != 0) 
+greater_than_one <- by_date %>% filter(dailycrashes !=0 & dailyrequests != 0) 
 View(greater_than_one)
 ```
 
@@ -229,8 +227,8 @@ View(first_model)
 
 get_regression_points(first_model)
 
-ggplot(greater_than_one, aes(y = dailycrashes, x = dailyrequests)) +
-  geom_point() +
+ggplot(without_ward, aes(y = dailycrashes, x = dailyrequests)) + 
+  geom_point() + 
   geom_parallel_slopes(se = FALSE)
 
 # sim1_mod <- lm(dailycrashes ~ dailyrequests, data = by_date, na.action=na.exclude)
